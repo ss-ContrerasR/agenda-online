@@ -31,6 +31,8 @@ export type AvailabilityParams = {
   employeeId?: string | null;
   excludeAppointmentId?: string | null;
   enforceNotice?: boolean;
+  /** Si es false, el personal puede agendar fuera del límite de anticipación. */
+  enforceAdvance?: boolean;
 };
 
 /**
@@ -172,7 +174,8 @@ export async function loadAvailability(
     organizationBufferMinutes: settings.buffer_minutes,
     slotIntervalMinutes: settings.slot_interval_minutes,
     minNoticeMinutes: params.enforceNotice ? settings.min_notice_minutes : 0,
-    maxAdvanceDays: settings.max_advance_days,
+    maxAdvanceDays:
+      params.enforceAdvance === false ? 3650 : settings.max_advance_days,
     businessHours: (businessHours ?? []).map((row) => ({
       weekday: row.weekday,
       isOpen: row.is_open,

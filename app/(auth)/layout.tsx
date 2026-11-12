@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { getCurrentYear } from "@/lib/year";
 
-export default function AuthLayout({ children }: LayoutProps<"/">) {
+export default async function AuthLayout({ children }: LayoutProps<"/">) {
+  const year = await getCurrentYear();
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-slate-950 p-10 text-slate-100 lg:flex lg:flex-col lg:justify-between">
@@ -59,7 +61,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           <div className="w-full max-w-md">{children}</div>
         </div>
         <footer className="px-5 py-5 text-center text-xs text-muted-foreground sm:px-8">
-          © {new Date().getFullYear()} AgendaPro. Todos los derechos reservados.
+          © {year} AgendaPro. Todos los derechos reservados.
         </footer>
       </main>
     </div>

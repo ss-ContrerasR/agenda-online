@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getCurrentYear } from "@/lib/year";
 import {
   ArrowRight,
   BarChart3,
@@ -81,7 +82,8 @@ const STEPS = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const year = await getCurrentYear();
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-md">
@@ -345,7 +347,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <Logo compact />
             <p>
-              © {new Date().getFullYear()} {APP_NAME}. Citas y reservas para
+              © {year} {APP_NAME}. Citas y reservas para
               negocios que viven de su tiempo.
             </p>
           </div>

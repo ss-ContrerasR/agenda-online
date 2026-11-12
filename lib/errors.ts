@@ -46,6 +46,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: "No tienes permisos para realizar esta acción.",
   DUPLICATE_EMAIL: "Ya existe un cliente con ese correo electrónico.",
   DUPLICATE_SLUG: "Ese identificador público ya está en uso.",
+  APPOINTMENT_STATUS_LOCKED:
+    "Esta cita ya está cerrada y no admite más cambios de estado.",
   INVALID_CREDENTIALS: "Correo o contraseña incorrectos.",
   EMAIL_NOT_CONFIRMED: "Debes confirmar tu correo antes de ingresar.",
 };
@@ -60,6 +62,12 @@ export function getActionError(error: unknown): string {
       raw.includes(code),
     );
     if (known) return ERROR_MESSAGES[known];
+    if (
+      raw.includes("exclusion constraint") ||
+      raw.includes("appointments_no_overlap")
+    ) {
+      return ERROR_MESSAGES.SLOT_CONFLICT;
+    }
     if (raw.includes("duplicate key") && raw.includes("clients")) {
       return ERROR_MESSAGES.DUPLICATE_EMAIL;
     }

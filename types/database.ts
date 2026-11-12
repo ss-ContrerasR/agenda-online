@@ -395,6 +395,15 @@ export type Database = {
         Args: { p_token: string; p_starts_at: string };
         Returns: AppointmentRow;
       };
+      set_appointment_status: {
+        Args: {
+          p_appointment_id: string;
+          p_status: AppointmentStatus;
+          p_actor?: string | null;
+          p_note?: string | null;
+        };
+        Returns: AppointmentRow;
+      };
     };
     Enums: {
       member_role: MemberRole;

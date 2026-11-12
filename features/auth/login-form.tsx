@@ -33,7 +33,9 @@ export function LoginForm() {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Bienvenido de nuevo</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Bienvenido de nuevo
+        </h1>
         <p className="text-sm text-muted-foreground">
           Ingresa para administrar tu agenda y tus reservas.
         </p>
@@ -42,24 +44,31 @@ export function LoginForm() {
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="next" value={next} />
         <div className="space-y-1.5">
-          <Label htmlFor="email">Correo electrónico</Label>
+          <Label htmlFor="email" className="text-foreground">
+            Correo electrónico
+          </Label>
+
           <div className="relative">
-            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
               placeholder="tu@negocio.com"
-              className="pl-9"
+              className="h-11 border-slate-300 bg-white pl-9 text-slate-900 placeholder:text-slate-400 shadow-sm focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               aria-invalid={Boolean(state.fieldErrors?.email)}
               required
             />
           </div>
+
           {state.fieldErrors?.email ? (
-            <p className="text-xs text-destructive">{state.fieldErrors.email}</p>
+            <p className="text-xs text-destructive">
+              {state.fieldErrors.email}
+            </p>
           ) : null}
         </div>
 
@@ -85,13 +94,21 @@ export function LoginForm() {
               type="button"
               onClick={() => setShowPassword((value) => !value)}
               className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={
+                showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+              }
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
           {state.fieldErrors?.password ? (
-            <p className="text-xs text-destructive">{state.fieldErrors.password}</p>
+            <p className="text-xs text-destructive">
+              {state.fieldErrors.password}
+            </p>
           ) : null}
         </div>
 
@@ -109,7 +126,8 @@ export function LoginForm() {
 
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-xs font-medium text-muted-foreground">
-          Cuentas de demostración · contraseña <span className="font-mono">Demo1234!</span>
+          Cuentas de demostración · contraseña{" "}
+          <span className="font-mono">Demo1234!</span>
         </p>
         <div className="mt-2 grid grid-cols-2 gap-1.5">
           {DEMO_ACCOUNTS.map((account) => (
@@ -120,7 +138,9 @@ export function LoginForm() {
               className="rounded-md border border-border bg-background px-2 py-1.5 text-left text-[11px] leading-tight transition-colors hover:border-primary/40 hover:bg-accent"
             >
               <span className="block font-medium">{account.label}</span>
-              <span className="block truncate text-muted-foreground">{account.email}</span>
+              <span className="block truncate text-muted-foreground">
+                {account.email}
+              </span>
             </button>
           ))}
         </div>
@@ -128,7 +148,10 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         ¿Aún no tienes cuenta?{" "}
-        <Link href="/registro" className="font-medium text-primary hover:underline">
+        <Link
+          href="/registro"
+          className="font-medium text-primary hover:underline"
+        >
           Crea tu negocio
         </Link>
       </p>
