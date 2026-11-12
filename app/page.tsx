@@ -102,7 +102,12 @@ export default async function HomePage() {
           </nav>
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="hidden sm:inline-flex"
+            >
               <Link href="/login">Iniciar sesión</Link>
             </Button>
             <Button asChild size="sm">
@@ -118,12 +123,12 @@ export default async function HomePage() {
             aria-hidden
             className="absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(45,212,191,0.28),transparent_45%),radial-gradient(circle_at_90%_100%,rgba(14,165,233,0.22),transparent_45%)]"
           />
-          <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
               <Badge className="border-white/20 bg-white/10 text-white">
                 <Sparkles className="size-3" /> Plataforma multi-negocio
               </Badge>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
                 Menos llamadas, más citas en tu agenda
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
@@ -161,7 +166,6 @@ export default async function HomePage() {
                 ))}
               </ul>
             </div>
-
             <div className="relative">
               <div className="rounded-2xl border border-white/15 bg-white/8 p-3 shadow-2xl backdrop-blur">
                 <div className="rounded-xl bg-slate-950/80 p-4">
@@ -183,15 +187,27 @@ export default async function HomePage() {
                         key={stat.label}
                         className="rounded-lg border border-white/10 bg-white/5 p-3"
                       >
-                        <p className="text-[10px] text-white/50">{stat.label}</p>
-                        <p className="mt-1 text-lg font-semibold">{stat.value}</p>
+                        <p className="text-[10px] text-white/50">
+                          {stat.label}
+                        </p>
+                        <p className="mt-1 text-lg font-semibold">
+                          {stat.value}
+                        </p>
                       </div>
                     ))}
                   </div>
                   <div className="mt-3 space-y-2">
                     {[
-                      { time: "09:00", name: "Corte y barba", who: "Carlos M." },
-                      { time: "10:30", name: "Color completo", who: "Laura G." },
+                      {
+                        time: "09:00",
+                        name: "Corte y barba",
+                        who: "Carlos M.",
+                      },
+                      {
+                        time: "10:30",
+                        name: "Color completo",
+                        who: "Laura G.",
+                      },
                       { time: "12:00", name: "Manicure spa", who: "Ana R." },
                     ].map((row) => (
                       <div
@@ -213,6 +229,10 @@ export default async function HomePage() {
                 </div>
               </div>
             </div>
+            <p className="max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
+              <span className="font-semibold text-white/80">Desarrollado por: </span>  Ing Sergio Contreras {" "}
+              <span className="font-semibold text-white/80">Teléfono: </span> +57 3203009633 {" "}
+            </p>
           </div>
         </section>
 
@@ -236,7 +256,10 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section id="modulos" className="scroll-mt-24 border-y border-border bg-muted/30">
+        <section
+          id="modulos"
+          className="scroll-mt-24 border-y border-border bg-muted/30"
+        >
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
             <div className="max-w-2xl">
               <p className="text-xs font-semibold tracking-widest text-primary uppercase">
@@ -269,7 +292,10 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-14 sm:px-6 sm:py-20">
+        <section
+          id="como-funciona"
+          className="mx-auto max-w-6xl scroll-mt-24 px-4 py-14 sm:px-6 sm:py-20"
+        >
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
               <p className="text-xs font-semibold tracking-widest text-primary uppercase">
@@ -347,8 +373,8 @@ export default async function HomePage() {
           <div className="flex items-center gap-3">
             <Logo compact />
             <p>
-              © {year} {APP_NAME}. Citas y reservas para
-              negocios que viven de su tiempo.
+              © {year} {APP_NAME}. Citas y reservas para negocios que viven de
+              su tiempo.
             </p>
           </div>
           <nav className="flex items-center gap-4">
@@ -358,7 +384,10 @@ export default async function HomePage() {
             <Link href="/registro" className="hover:text-foreground">
               Crear cuenta
             </Link>
-            <Link href={`/reservar/${DEMO_ORG_SLUG}`} className="hover:text-foreground">
+            <Link
+              href={`/reservar/${DEMO_ORG_SLUG}`}
+              className="hover:text-foreground"
+            >
               Reserva demo
             </Link>
           </nav>
@@ -383,7 +412,9 @@ function Highlight({
         <Icon className="size-4.5" />
       </span>
       <p className="mt-3 text-sm font-medium">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {text}
+      </p>
     </div>
   );
 }
