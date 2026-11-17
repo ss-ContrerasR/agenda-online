@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -42,6 +43,24 @@ export function PublicBookingProvider({
   const [open, setOpen] = useState(false);
   const [initialServiceId, setInitialServiceId] = useState<string | null>(null);
   const [instance, setInstance] = useState(0);
+  /**
+   * El asistente registra aquí su propio manejador de salida. Así Escape, la X
+   * y el clic fuera del modal pasan por la confirmación en lugar de cerrar la
+   * reserva a medias.
+   */
+  const requestCloseRef = useRef<() => void>(() => setOpen(false));
+
+  const registerCloseHandler = useCallback((handler: () => void) => {
+    requestCloseRef.current = handler;
+  }, []);
+
+  const handleOpenChange = useCallback((next: boolean) => {
+    if (next) {
+      setOpen(true);
+      return;
+    }
+    requestCloseRef.current();
+  }, []);
 
   const openWizard = useCallback((serviceId?: string) => {
     setInitialServiceId(serviceId ?? null);
@@ -54,7 +73,7 @@ export function PublicBookingProvider({
   return (
     <BookingContext.Provider value={value}>
       {children}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-5xl gap-0 overflow-hidden p-0">
           <DialogTitle className="sr-only">Reservar una cita</DialogTitle>
           <DialogDescription className="sr-only">
@@ -67,6 +86,7 @@ export function PublicBookingProvider({
               config={config}
               initialServiceId={initialServiceId}
               onClose={() => setOpen(false)}
+              registerCloseHandler={registerCloseHandler}
             />
           ) : null}
         </DialogContent>

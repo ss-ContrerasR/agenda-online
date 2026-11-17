@@ -22,6 +22,8 @@ export function SearchInput({
   const [, startTransition] = useTransition();
 
   useEffect(() => {
+    // Sincroniza el input cuando la URL cambia (atrás/adelante del navegador).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue(searchParams.get(param) ?? "");
   }, [searchParams, param]);
 

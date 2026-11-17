@@ -97,6 +97,9 @@ export default async function HomePage() {
               <a href="#como-funciona">Cómo funciona</a>
             </Button>
             <Button asChild variant="ghost" size="sm">
+              <Link href="/negocios">Negocios</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
               <Link href={`/reservar/${DEMO_ORG_SLUG}`}>Reserva demo</Link>
             </Button>
           </nav>
@@ -378,6 +381,9 @@ export default async function HomePage() {
             </p>
           </div>
           <nav className="flex items-center gap-4">
+            <Link href="/negocios" className="hover:text-foreground">
+              Negocios
+            </Link>
             <Link href="/login" className="hover:text-foreground">
               Iniciar sesión
             </Link>

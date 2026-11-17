@@ -2,6 +2,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 export type PeriodPreset =
   | "today"
+  | "upcoming"
   | "7d"
   | "30d"
   | "month"
@@ -68,6 +69,11 @@ export function resolvePeriod(input: {
   switch (preset) {
     case "today":
       break;
+    case "upcoming":
+      to = addDaysToDateString(today, 30);
+      label = "Próximas 4 semanas";
+      resolved = "upcoming";
+      break;
     case "7d":
       from = addDaysToDateString(today, -6);
       label = "Últimos 7 días";
@@ -121,6 +127,7 @@ export function resolvePeriod(input: {
 
 export const PERIOD_OPTIONS: Array<{ value: PeriodPreset; label: string }> = [
   { value: "today", label: "Hoy" },
+  { value: "upcoming", label: "Próximas 4 semanas" },
   { value: "7d", label: "Últimos 7 días" },
   { value: "30d", label: "Últimos 30 días" },
   { value: "month", label: "Este mes" },

@@ -20,6 +20,7 @@ import type {
   ServiceRow,
 } from "@/types/database";
 import {
+  activeAppointmentEmailSchema,
   cancelPublicAppointmentSchema,
   publicBookingSchema,
   reschedulePublicAppointmentSchema,
@@ -28,6 +29,7 @@ import {
 } from "@/features/public-booking/schemas";
 import { getAppointmentByToken } from "@/features/public-booking/queries";
 import type {
+  ActiveAppointmentSummary,
   BookingResultData,
   PublicAppointmentDetails,
   SlotsPayload,
@@ -35,7 +37,12 @@ import type {
 
 export type PublicActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+  | {
+      ok: false;
+      error: string;
+      fieldErrors?: Record<string, string>;
+      activeAppointment?: ActiveAppointmentSummary;
+    };
 
 function unavailable(): PublicActionResult<never> {
   return { ok: false, error: "Las reservas en línea no están disponibles." };
@@ -58,6 +65,7 @@ async function resolveOrganization(slug: string) {
     .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
+    .in("billing_status", ["active", "trialing"])
     .is("deleted_at", null)
     .maybeSingle();
   return data;
@@ -112,6 +120,80 @@ async function findExistingAppointment(
     .maybeSingle();
 
   return data ?? null;
+}
+
+/**
+ * Un cliente no puede agendar otra cita mientras tenga una pendiente o
+ * confirmada con fecha futura en el mismo negocio. Se busca por correo (el
+ * dato que el visitante conoce) y se devuelve un resumen para mostrar la cita
+ * existente en lugar de crear una nueva.
+ */
+async function findActiveAppointmentByEmail(
+  admin: SupabaseClient<Database>,
+  organizationId: string,
+  email: string,
+): Promise<ActiveAppointmentSummary | null> {
+  const { data: clients } = await admin
+    .from("clients")
+    .select("id, full_name, email")
+    .eq("organization_id", organizationId)
+    .ilike("email", email)
+    .is("deleted_at", null);
+
+  if (!clients?.length) return null;
+
+  const { data: appointment } = await admin
+    .from("appointments")
+    .select(
+      "id, public_token, status, starts_at, service_id, employee_id, client_id",
+    )
+    .eq("organization_id", organizationId)
+    .in(
+      "client_id",
+      clients.map((client) => client.id),
+    )
+    .in("status", ["pending", "confirmed"])
+    .gte("starts_at", new Date().toISOString())
+    .is("deleted_at", null)
+    .order("starts_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!appointment) return null;
+
+  const [{ data: organization }, { data: service }, { data: employee }] =
+    await Promise.all([
+      admin
+        .from("organizations")
+        .select("name, timezone")
+        .eq("id", organizationId)
+        .maybeSingle(),
+      admin
+        .from("services")
+        .select("name")
+        .eq("id", appointment.service_id)
+        .maybeSingle(),
+      admin
+        .from("employees")
+        .select("full_name")
+        .eq("id", appointment.employee_id)
+        .maybeSingle(),
+    ]);
+
+  const client =
+    clients.find((item) => item.id === appointment.client_id) ?? clients[0];
+
+  return {
+    id: appointment.id,
+    token: appointment.public_token,
+    status: appointment.status,
+    startsAt: appointment.starts_at,
+    serviceName: service?.name ?? "Servicio",
+    employeeName: employee?.full_name ?? "Por asignar",
+    organizationName: organization?.name ?? "",
+    timezone: organization?.timezone ?? "UTC",
+    clientName: client?.full_name ?? "",
+  };
 }
 
 async function upsertClient(
@@ -286,6 +368,38 @@ export async function loadRescheduleSlotsAction(
   }
 }
 
+/**
+ * Consulta pública usada por el asistente en cuanto el visitante escribe su
+ * correo. No crea ni modifica datos: solo informa si ya tiene una cita activa.
+ */
+export async function findActiveAppointmentByEmailAction(
+  rawInput: unknown,
+): Promise<PublicActionResult<ActiveAppointmentSummary | null>> {
+  const parsed = activeAppointmentEmailSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: "Ingresa un correo válido." };
+  }
+
+  if (!isAdminClientConfigured()) return unavailable();
+
+  try {
+    const admin = createSupabaseAdminClient();
+    const organization = await resolveOrganization(parsed.data.slug);
+    if (!organization) {
+      throw new AppError("ORGANIZATION_NOT_FOUND", "El negocio no está disponible.");
+    }
+
+    const active = await findActiveAppointmentByEmail(
+      admin,
+      organization.id,
+      normalizeEmail(parsed.data.email),
+    );
+    return { ok: true, data: active };
+  } catch (error) {
+    return { ok: false, error: getActionError(error) };
+  }
+}
+
 export async function createPublicAppointmentAction(
   rawInput: unknown,
 ): Promise<PublicActionResult<BookingResultData>> {
@@ -337,6 +451,21 @@ export async function createPublicAppointmentAction(
 
     const email = normalizeEmail(input.email);
     const phone = normalizePhone(input.phone);
+
+    // Protección definitiva en servidor: aunque el asistente se salte la
+    // comprobación previa, un correo con cita activa no genera otra reserva.
+    const activeAppointment = await findActiveAppointmentByEmail(
+      admin,
+      organization.id,
+      email,
+    );
+    if (activeAppointment) {
+      return {
+        ok: false,
+        error: "Ya tienes una cita pendiente con este correo.",
+        activeAppointment,
+      };
+    }
 
     const existingClient = await findClient(admin, organization.id, email, phone);
     if (existingClient) {

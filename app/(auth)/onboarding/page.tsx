@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getCurrentUser, getSessionContext } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/env";
 import { OnboardingForm } from "@/features/auth/onboarding-form";
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 
 async function OnboardingGate() {
   if (!isSupabaseConfigured) redirect("/configuracion-requerida");
+  await connection();
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/onboarding");
   const session = await getSessionContext();

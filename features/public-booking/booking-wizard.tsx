@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +16,7 @@ import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import type { LucideIcon } from "lucide-react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CalendarCheck2,
@@ -34,16 +41,25 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { cn, formatCurrency, formatTimeInTz, initials } from "@/lib/utils";
+import {
+  cn,
+  formatCurrency,
+  formatDateInTz,
+  formatTimeInTz,
+  initials,
+} from "@/lib/utils";
 import { groupSlotsByPeriod } from "@/lib/availability";
 import {
+  activeAppointmentEmailSchema,
   bookingDetailsSchema,
 } from "@/features/public-booking/schemas";
 import {
   createPublicAppointmentAction,
+  findActiveAppointmentByEmailAction,
   loadPublicSlotsAction,
 } from "@/features/public-booking/actions";
 import type {
+  ActiveAppointmentSummary,
   BookingResultData,
   PublicSlot,
   SlotsPayload,
@@ -112,10 +128,6 @@ function shiftDate(date: string, days: number) {
   return value.toISOString().slice(0, 10);
 }
 
-function dayLabel(date: string) {
-  return format(parse(date, "yyyy-MM-dd", new Date()), "d MMM", { locale: es });
-}
-
 function longDate(date: string) {
   return format(parse(date, "yyyy-MM-dd", new Date()), "EEEE d 'de' MMMM", {
     locale: es,
@@ -132,10 +144,12 @@ export function BookingWizard({
   config,
   initialServiceId,
   onClose,
+  registerCloseHandler,
 }: {
   config: BookingConfig;
   initialServiceId?: string | null;
   onClose: () => void;
+  registerCloseHandler?: (handler: () => void) => void;
 }) {
   const initialService =
     config.services.find((service) => service.id === initialServiceId) ?? null;
@@ -155,6 +169,57 @@ export function BookingWizard({
   const [details, setDetails] = useState<DetailsValues | null>(null);
   const [confirmation, setConfirmation] = useState<BookingResultData | null>(null);
   const [saving, startSaving] = useTransition();
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+
+  /**
+   * Escape, la X y el clic fuera del modal llaman aquí. Si la reserva todavía
+   * no se completó se pide confirmación; si ya se agendó, se cierra directo.
+   * Un segundo intento de salida descarta la confirmación y mantiene el
+   * asistente abierto.
+   */
+  const attemptClose = useCallback(() => {
+    if (confirmation) {
+      onClose();
+      return;
+    }
+    setExitConfirmOpen((value) => !value);
+  }, [confirmation, onClose]);
+
+  useEffect(() => {
+    registerCloseHandler?.(attemptClose);
+  }, [attemptClose, registerCloseHandler]);
+
+  const [activeAppointment, setActiveAppointment] =
+    useState<ActiveAppointmentSummary | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
+  /**
+   * Consulta en la base de datos si ese correo ya tiene una cita activa en este
+   * negocio. Si la encuentra, guarda el resumen para mostrarlo en lugar de
+   * permitir una nueva reserva.
+   */
+  async function checkActiveEmail(email: string) {
+    const parsed = activeAppointmentEmailSchema.safeParse({
+      slug: config.slug,
+      email,
+    });
+    if (!parsed.success) return false;
+
+    setCheckingEmail(true);
+    try {
+      const result = await findActiveAppointmentByEmailAction(parsed.data);
+      if (result.ok && result.data) {
+        setActiveAppointment(result.data);
+        return true;
+      }
+      return false;
+    } catch {
+      // Si la consulta falla, la creación de la cita vuelve a validar en server.
+      return false;
+    } finally {
+      setCheckingEmail(false);
+    }
+  }
 
   const service = useMemo(
     () => config.services.find((item) => item.id === serviceId) ?? null,
@@ -170,11 +235,6 @@ export function BookingWizard({
     );
     return config.employees.filter((employee) => ids.has(employee.id));
   }, [config.employeeServices, config.employees, serviceId]);
-
-  const canChooseEmployee =
-    config.allowEmployeeSelection &&
-    config.showEmployees &&
-    eligibleEmployees.length > 1;
 
   const form = useForm<DetailsValues>({
     resolver: zodResolver(bookingDetailsSchema),
@@ -192,6 +252,8 @@ export function BookingWizard({
     if (step !== 3 || !serviceId || !date) return;
 
     let active = true;
+    // Carga de disponibilidad al entrar al paso de fecha y hora.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingSlots(true);
     setSlotError(null);
 
@@ -275,9 +337,17 @@ export function BookingWizard({
     setStep(4);
   }
 
-  function submitDetails(values: DetailsValues) {
+  async function submitDetails(values: DetailsValues) {
+    const hasActive = await checkActiveEmail(values.email);
+    if (hasActive) return;
     setDetails(values);
     setStep(5);
+  }
+
+  function resetActiveAppointment() {
+    setActiveAppointment(null);
+    setExitConfirmOpen(false);
+    setStep(4);
   }
 
   function confirm() {
@@ -297,6 +367,10 @@ export function BookingWizard({
       });
 
       if (!result.ok) {
+        if (result.activeAppointment) {
+          setActiveAppointment(result.activeAppointment);
+          return;
+        }
         toast.error(result.error);
         if (result.fieldErrors) {
           for (const [field, message] of Object.entries(result.fieldErrors)) {
@@ -333,6 +407,124 @@ export function BookingWizard({
     [config.timezone, slots],
   );
 
+  if (activeAppointment) {
+    const statusLabel =
+      activeAppointment.status === "confirmed"
+        ? "Confirmada"
+        : "Pendiente de confirmación";
+
+    return (
+      <div className="relative flex max-h-[90dvh] flex-col">
+        <div className="border-b border-border px-5 py-4 pr-12 sm:px-6">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <CalendarCheck2 className="size-4 text-primary" />
+            Reserva en línea
+          </div>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight">
+            Ya tienes una cita pendiente
+          </h2>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                <AlertTriangle className="size-5" />
+              </span>
+              <div>
+                <h3 className="font-semibold">No puedes agendar otra cita</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Encontramos una cita activa con el correo{" "}
+                  <span className="font-medium text-foreground">
+                    {form.getValues("email") || activeAppointment.clientName}
+                  </span>
+                  . Revisa los datos antes de reservar de nuevo.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+              Tu cita actual
+            </p>
+            <div className="mt-4 space-y-3.5 text-sm">
+              <SummaryLine
+                icon={Sparkles}
+                label="Servicio"
+                value={activeAppointment.serviceName}
+              />
+              <SummaryLine
+                icon={CalendarDays}
+                label="Fecha"
+                value={formatDateInTz(
+                  activeAppointment.startsAt,
+                  activeAppointment.timezone,
+                  "EEEE d 'de' MMMM",
+                )}
+              />
+              <SummaryLine
+                icon={Clock3}
+                label="Hora"
+                value={formatTimeInTz(
+                  activeAppointment.startsAt,
+                  activeAppointment.timezone,
+                )}
+              />
+              <SummaryLine
+                icon={UserRound}
+                label="Profesional"
+                value={activeAppointment.employeeName}
+              />
+              <SummaryLine
+                icon={CalendarCheck2}
+                label="Estado"
+                value={statusLabel}
+              />
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <Button asChild className="flex-1">
+                <Link
+                  href={`/reservar/${config.slug}/cita/${activeAppointment.token}`}
+                >
+                  Ver y gestionar mi cita <ArrowRight />
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetActiveAppointment}
+              >
+                Usar otro correo
+              </Button>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Si ya no necesitas esta cita, cancélala desde el enlace anterior y
+            vuelve a reservar cuando quieras.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-border bg-card px-5 py-4 sm:px-6">
+          <Button type="button" variant="ghost" onClick={attemptClose}>
+            Cerrar
+          </Button>
+          <span className="truncate text-xs text-muted-foreground">
+            {activeAppointment.organizationName}
+          </span>
+        </div>
+
+        <ExitConfirmation
+          visible={exitConfirmOpen}
+          onCancel={() => setExitConfirmOpen(false)}
+          onConfirm={onClose}
+        />
+      </div>
+    );
+  }
+
   if (confirmation) {
     return (
       <ConfirmationView
@@ -346,7 +538,7 @@ export function BookingWizard({
   }
 
   return (
-    <div className="flex max-h-[90dvh] flex-col">
+    <div className="relative flex max-h-[90dvh] flex-col">
       <div className="border-b border-border px-5 py-4 pr-12 sm:px-6">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <CalendarCheck2 className="size-4 text-primary" />
@@ -436,6 +628,15 @@ export function BookingWizard({
               form={form}
               policyText={config.policyText}
               onSubmit={submitDetails}
+              checkingEmail={checkingEmail}
+              onEmailBlur={(email) => {
+                if (!activeAppointmentEmailSchema.safeParse({ slug: config.slug, email }).success) {
+                  return;
+                }
+                void checkActiveEmail(email).then((hasActive) => {
+                  if (!hasActive) setActiveAppointment(null);
+                });
+              }}
             />
           ) : null}
 
@@ -526,7 +727,7 @@ export function BookingWizard({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => (step === 1 ? onClose() : setStep((step - 1) as Step))}
+          onClick={() => (step === 1 ? attemptClose() : setStep((step - 1) as Step))}
         >
           {step === 1 ? "Cancelar" : <><ArrowLeft /> Atrás</>}
         </Button>
@@ -535,7 +736,8 @@ export function BookingWizard({
           <Button
             type="submit"
             form="booking-details-form"
-            disabled={!form.formState.isValid}
+            disabled={!form.formState.isValid || checkingEmail}
+            loading={checkingEmail}
           >
             Revisar reserva <ArrowRight />
           </Button>
@@ -556,6 +758,70 @@ export function BookingWizard({
             Continuar <ArrowRight />
           </Button>
         )}
+      </div>
+
+      <ExitConfirmation
+        visible={exitConfirmOpen}
+        onCancel={() => setExitConfirmOpen(false)}
+        onConfirm={onClose}
+      />
+    </div>
+  );
+}
+
+function ExitConfirmation({
+  visible,
+  onCancel,
+  onConfirm,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <div
+      className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="exit-confirm-title"
+        aria-describedby="exit-confirm-description"
+        className="w-full max-w-sm rounded-xl border border-border bg-popover p-5 shadow-2xl"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <AlertTriangle className="size-5" />
+          </span>
+          <div>
+            <h3 id="exit-confirm-title" className="font-semibold">
+              ¿Cancelar tu reserva?
+            </h3>
+            <p
+              id="exit-confirm-description"
+              className="mt-1 text-sm leading-relaxed text-muted-foreground"
+            >
+              Si sales ahora perderás el servicio, el horario y los datos que
+              hayas elegido. Tu cita todavía no se ha agendado.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" autoFocus onClick={onCancel}>
+            Seguir reservando
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm}>
+            Sí, salir
+          </Button>
+        </div>
+        <p className="mt-3 text-center text-[11px] text-muted-foreground">
+          También puedes presionar Escape para continuar con la reserva.
+        </p>
       </div>
     </div>
   );
@@ -964,10 +1230,14 @@ function DetailsStep({
   form,
   policyText,
   onSubmit,
+  onEmailBlur,
+  checkingEmail,
 }: {
   form: UseFormReturn<DetailsValues>;
   policyText: string | null;
-  onSubmit: (values: DetailsValues) => void;
+  onSubmit: (values: DetailsValues) => void | Promise<void>;
+  onEmailBlur?: (email: string) => void;
+  checkingEmail?: boolean;
 }) {
   const {
     register,
@@ -1014,11 +1284,18 @@ function DetailsStep({
               placeholder="tu@correo.com"
               className="pl-9"
               aria-invalid={Boolean(errors.email)}
-              {...register("email")}
+              {...register("email", {
+                onBlur: (event) => onEmailBlur?.(String(event.target.value)),
+              })}
             />
           </div>
           {errors.email ? (
             <p className="text-xs text-destructive">{errors.email.message}</p>
+          ) : checkingEmail ? (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Verificando si ya tienes una cita…
+            </p>
           ) : null}
         </div>
 

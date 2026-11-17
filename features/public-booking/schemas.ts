@@ -48,6 +48,11 @@ export const publicBookingSchema = z.object({
   }),
 });
 
+export const activeAppointmentEmailSchema = z.object({
+  slug: slugField,
+  email: z.email("Ingresa un correo válido"),
+});
+
 export const bookingDetailsSchema = z.object({
   fullName: z
     .string()
@@ -83,6 +88,9 @@ export const reschedulePublicAppointmentSchema = z.object({
   start: z.iso.datetime({ offset: true, message: "Horario inválido" }),
 });
 
+export type ActiveAppointmentEmailRequest = z.infer<
+  typeof activeAppointmentEmailSchema
+>;
 export type SlotsRequest = z.infer<typeof slotsRequestSchema>;
 export type RescheduleSlotsRequest = z.infer<typeof rescheduleSlotsRequestSchema>;
 export type PublicBookingInput = z.infer<typeof publicBookingSchema>;

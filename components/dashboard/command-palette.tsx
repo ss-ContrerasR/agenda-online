@@ -65,6 +65,8 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) {
+      // Reinicio intencional del estado del diálogo al cerrarse.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery("");
       setResults([]);
       return;
@@ -76,6 +78,8 @@ export function CommandPalette({
   useEffect(() => {
     const value = query.trim();
     if (value.length < 2) {
+      // Limpiar resultados cuando la búsqueda deja de ser válida.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       setLoading(false);
       return;

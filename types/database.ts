@@ -17,6 +17,19 @@ export type BookingConfirmationMode = "automatic" | "manual";
 export type PublicTheme = "light" | "dark" | "system";
 export type NotificationChannel = "email" | "in_app" | "whatsapp";
 export type NotificationStatus = "pending" | "sent" | "failed" | "skipped";
+export type MembershipStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "suspended"
+  | "cancelled";
+export type BillingStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "suspended"
+  | "cancelled";
+export type SuspensionAction = "suspended" | "reactivated";
 
 type Table<Row, Required extends keyof Row = never> = {
   Row: Row;
@@ -40,6 +53,10 @@ export type OrganizationRow = {
   timezone: string;
   currency: string;
   is_active: boolean;
+  billing_status: BillingStatus;
+  current_period_end: string | null;
+  suspended_at: string | null;
+  suspended_reason: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -81,8 +98,26 @@ export type ProfileRow = {
   email: string | null;
   phone: string | null;
   avatar_url: string | null;
+  is_suspended: boolean;
+  suspended_at: string | null;
+  suspended_until: string | null;
+  suspended_reason: string | null;
+  suspended_by: string | null;
+  membership_status: MembershipStatus;
+  membership_expires_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type UserSuspensionHistoryRow = {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  action: SuspensionAction;
+  reason: string | null;
+  suspended_until: string | null;
+  actor_id: string | null;
+  created_at: string;
 };
 
 export type OrganizationMemberRow = {
@@ -295,6 +330,10 @@ export type Database = {
       >;
       profiles: Table<ProfileRow, "id">;
       platform_admins: Table<PlatformAdminRow, "user_id">;
+      user_suspension_history: Table<
+        UserSuspensionHistoryRow,
+        "user_id" | "action"
+      >;
       organization_members: Table<
         OrganizationMemberRow,
         "organization_id" | "user_id"
@@ -403,6 +442,18 @@ export type Database = {
           p_note?: string | null;
         };
         Returns: AppointmentRow;
+      };
+      set_user_suspension: {
+        Args: {
+          p_user_id: string;
+          p_suspended: boolean;
+          p_reason?: string | null;
+          p_until?: string | null;
+          p_membership_status?: MembershipStatus | null;
+          p_organization_id?: string | null;
+          p_actor_id?: string | null;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

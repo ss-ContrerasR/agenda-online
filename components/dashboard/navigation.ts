@@ -110,9 +110,25 @@ export function getNavigation(
       label: "Plataforma",
       items: [
         {
-          label: "Empresas",
+          label: "Panel de plataforma",
           href: "/admin",
           icon: Building2,
+          exact: true,
+        },
+        {
+          label: "Todas las empresas",
+          href: "/admin/empresas",
+          icon: Building2,
+        },
+        {
+          label: "Todos los usuarios",
+          href: "/admin/usuarios",
+          icon: ShieldCheck,
+        },
+        {
+          label: "Auditoría",
+          href: "/admin/auditoria",
+          icon: BarChart3,
         },
       ],
     });

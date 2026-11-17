@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { auditAction } from "@/lib/action-audit";
@@ -21,6 +21,8 @@ function revalidateCatalog() {
   revalidatePath("/dashboard/empleados");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/citas");
+  revalidateTag("public-organizations", "max");
+  revalidateTag("public-directory", "max");
 }
 
 function parseServiceForm(formData: FormData) {

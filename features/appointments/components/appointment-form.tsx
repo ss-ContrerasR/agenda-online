@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CalendarClock, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -83,6 +84,8 @@ export function AppointmentForm({
 
   useEffect(() => {
     if (employeeId && !eligibleEmployees.some((employee) => employee.id === employeeId)) {
+      // El empleado seleccionado dejó de ofrecer el servicio elegido.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmployeeId("");
     }
   }, [eligibleEmployees, employeeId]);
@@ -266,7 +269,7 @@ export function AppointmentForm({
           </Button>
         ) : (
           <Button asChild variant="outline">
-            <a href="/dashboard/citas">Volver a citas</a>
+            <Link href="/dashboard/citas">Volver a citas</Link>
           </Button>
         )}
         <Button type="submit" disabled={pending}>

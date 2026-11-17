@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import {
   ArrowRight,
+  Building2,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -237,6 +238,12 @@ async function PublicPageContent({
                   ) : null}
                   <Button asChild variant="ghost" size="sm">
                     <a href="#horario">Horario</a>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/negocios">
+                      <Building2 className="size-3.5" />
+                      Otros negocios
+                    </Link>
                   </Button>
                   {settings.dark_mode_enabled ? <ThemeToggle /> : null}
                 </nav>
@@ -665,9 +672,14 @@ async function PublicPageContent({
                 </Link>
                 .
               </p>
-              <Link href="/login" className="hover:text-foreground">
-                Acceso al panel
-              </Link>
+              <div className="flex items-center gap-4">
+                <Link href="/negocios" className="hover:text-foreground">
+                  Ver otros negocios
+                </Link>
+                <Link href="/login" className="hover:text-foreground">
+                  Acceso al panel
+                </Link>
+              </div>
             </div>
           </footer>
 

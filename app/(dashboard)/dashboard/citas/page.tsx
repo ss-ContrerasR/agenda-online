@@ -123,7 +123,9 @@ export default async function AppointmentsPage({
   ]);
 
   const period = resolvePeriod({
-    preset: first(params.period),
+    // La agenda operativa debe abrir con las citas próximas; si no, una
+    // reserva hecha para mañana quedaría fuera del rango por defecto.
+    preset: first(params.period) ?? "upcoming",
     from: first(params.from),
     to: first(params.to),
     timezone,

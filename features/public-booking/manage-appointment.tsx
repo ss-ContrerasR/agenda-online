@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format, parse } from "date-fns";
+import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -79,7 +79,9 @@ export function ManageAppointment({
   const [cancelling, startCancel] = useTransition();
 
   const startsAt = new Date(appointment.starts_at);
-  const now = Date.now();
+  // Se congela al montar: las fechas límite de la cita no cambian durante la
+  // sesión y así evitamos leer una función impura en cada render.
+  const [now] = useState(() => Date.now());
   const active = appointment.status === "pending" || appointment.status === "confirmed";
   const started = startsAt.getTime() <= now;
   const cancelDeadline =
@@ -437,6 +439,8 @@ function RescheduleDialog({
     if (!open) return;
     const today = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
     const initial = today > minDate ? today : minDate;
+    // Inicializa el calendario al abrir el diálogo de reprogramación.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDate(initial);
     setCursor(initial);
     void loadSlots(initial);

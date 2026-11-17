@@ -57,3 +57,16 @@ export type BookingResultData = {
   status: string;
   startsAt: string;
 };
+
+/** Resumen de la cita activa que ya tiene un cliente por su correo. */
+export type ActiveAppointmentSummary = {
+  id: string;
+  token: string;
+  status: string;
+  startsAt: string;
+  serviceName: string;
+  employeeName: string;
+  organizationName: string;
+  timezone: string;
+  clientName: string;
+};

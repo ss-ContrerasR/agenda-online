@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import {
   getCurrentUser,
   getPlatformAdminUser,
@@ -11,6 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 async function DashboardGate({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured) redirect("/configuracion-requerida");
+
+  // Evita que la sesión (y su validación de expiración) se ejecute al
+  // prerenderizar el shell del panel.
+  await connection();
 
   const session = await getSessionContext();
   if (!session) {

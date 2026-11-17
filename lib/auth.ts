@@ -1,6 +1,7 @@
 import "server-only";
 
-import { cache } from "react";
+import { cacheLife } from "next/cache";
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -26,6 +27,14 @@ export type SessionContext = {
   settings: OrganizationSettingsRow;
   isPlatformAdmin: boolean;
 };
+
+export type PlatformAdminContext = {
+  user: User;
+  profile: ProfileRow | null;
+};
+
+/** Duración de la caché privada de sesión: se guarda solo en el navegador. */
+const SESSION_CACHE = { stale: 30, revalidate: 60, expire: 300 } as const;
 
 export const DEFAULT_SETTINGS: Omit<
   OrganizationSettingsRow,
@@ -57,105 +66,152 @@ export const DEFAULT_SETTINGS: Omit<
   seo_description: null,
 };
 
-export const getCurrentUser = cache(async () => {
+/**
+ * La sesión de Supabase valida el token comparando su expiración con la hora
+ * actual (Date.now dentro de auth-js). Con Cache Components ese valor no puede
+ * formar parte del HTML prerenderizado: `'use cache: private'` ejecuta la lectura
+ * en tiempo de petición y la mantiene únicamente en la caché del navegador.
+ */
+export async function getCurrentUser(): Promise<User | null> {
+  "use cache: private";
+  cacheLife(SESSION_CACHE);
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-});
+}
 
-export const getSessionContext = cache(
-  async (): Promise<SessionContext | null> => {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+export function isProfileSuspended(profile: ProfileRow | null | undefined) {
+  if (!profile) return false;
+  const until = profile.suspended_until
+    ? new Date(profile.suspended_until).getTime()
+    : null;
+  const temporarySuspension =
+    (profile.is_suspended || until !== null) &&
+    (until === null || until > Date.now());
 
-    if (!user) return null;
+  return (
+    temporarySuspension ||
+    profile.membership_status === "suspended" ||
+    profile.membership_status === "cancelled"
+  );
+}
 
-    const { data: membership } = await supabase
-      .from("organization_members")
-      .select("id, organization_id, role, employee_id")
+export async function getSessionContext(): Promise<SessionContext | null> {
+  "use cache: private";
+  cacheLife(SESSION_CACHE);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("id, organization_id, role, employee_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const [{ data: profile }, { data: platformAdmin }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("platform_admins")
+      .select("user_id")
       .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .maybeSingle(),
+  ]);
 
-    const [{ data: profile }, { data: platformAdmin }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("platform_admins")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+  if (isProfileSuspended(profile)) redirect("/suspendido");
 
-    if (!membership) {
-      return null;
-    }
+  if (!membership) {
+    return null;
+  }
 
-    const [{ data: organization }, { data: settings }] = await Promise.all([
-      supabase
-        .from("organizations")
-        .select("*")
-        .eq("id", membership.organization_id)
-        .maybeSingle(),
-      supabase
-        .from("organization_settings")
-        .select("*")
-        .eq("organization_id", membership.organization_id)
-        .maybeSingle(),
-    ]);
+  const [{ data: organization }, { data: settings }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", membership.organization_id)
+      .maybeSingle(),
+    supabase
+      .from("organization_settings")
+      .select("*")
+      .eq("organization_id", membership.organization_id)
+      .maybeSingle(),
+  ]);
 
-    if (!organization) return null;
+  if (!organization) return null;
 
-    return {
-      user,
-      profile: profile ?? null,
-      membership: {
-        id: membership.id,
-        organization_id: membership.organization_id,
-        role: membership.role,
-        employee_id: membership.employee_id,
-      },
-      organization,
-      settings: {
-        organization_id: organization.id,
-        ...DEFAULT_SETTINGS,
-        ...(settings ?? {}),
-        created_at: settings?.created_at ?? organization.created_at,
-        updated_at: settings?.updated_at ?? organization.updated_at,
-      },
-      isPlatformAdmin: Boolean(platformAdmin),
-    };
-  },
-);
+  return {
+    user,
+    profile: profile ?? null,
+    membership: {
+      id: membership.id,
+      organization_id: membership.organization_id,
+      role: membership.role,
+      employee_id: membership.employee_id,
+    },
+    organization,
+    settings: {
+      organization_id: organization.id,
+      ...DEFAULT_SETTINGS,
+      ...(settings ?? {}),
+      created_at: settings?.created_at ?? organization.created_at,
+      updated_at: settings?.updated_at ?? organization.updated_at,
+    },
+    isPlatformAdmin: Boolean(platformAdmin),
+  };
+}
 
-export const getPlatformAdminUser = cache(async () => {
+/** Contexto del superadministrador, con o sin membresía en una organización. */
+export async function getPlatformAdminContext(): Promise<PlatformAdminContext | null> {
+  "use cache: private";
+  cacheLife(SESSION_CACHE);
+
   const user = await getCurrentUser();
   if (!user) return null;
+
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("platform_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  return data ? user : null;
-});
+  const [{ data: profile }, { data: admin }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  if (!admin) return null;
+  if (isProfileSuspended(profile)) redirect("/suspendido");
+
+  return { user, profile: profile ?? null };
+}
+
+/** Compatibilidad con el panel existente. */
+export async function getPlatformAdminUser(): Promise<User | null> {
+  const context = await getPlatformAdminContext();
+  return context?.user ?? null;
+}
 
 export async function requireSession(): Promise<SessionContext> {
+  // La sesión de Supabase compara la expiración del token con la hora actual.
+  // `connection()` detiene el prerender antes de llegar a auth-js, de modo que
+  // esas lecturas (y cualquier `new Date()` posterior) ocurren por petición.
+  await connection();
   const session = await getSessionContext();
   if (!session) redirect("/login");
   return session;
 }
 
 export async function requireSessionOrOnboarding(): Promise<SessionContext | null> {
+  await connection();
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const session = await getSessionContext();
@@ -193,4 +249,12 @@ export async function requirePlatformAdmin(): Promise<SessionContext> {
   const session = await requireSession();
   if (!session.isPlatformAdmin) redirect("/dashboard");
   return session;
+}
+
+/** Autorización para las rutas /admin (no exige pertenecer a una empresa). */
+export async function requirePlatformAdminContext(): Promise<PlatformAdminContext> {
+  await connection();
+  const context = await getPlatformAdminContext();
+  if (!context) redirect("/dashboard");
+  return context;
 }

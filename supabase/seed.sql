@@ -5,6 +5,9 @@
 --   recepcion@estudioaurora.com  → recepcionista
 --   valeria@estudioaurora.com    → empleada
 --   admin@agendapro.co           → superadministrador de plataforma
+--   owner@barberianorte.com      → propietario de Barbería Norte
+--   owner@tex.com                → propietario de Tex Studio (/reservar/tex)
+-- Todos usan la contraseña Demo1234!.
 -- Este archivo se ejecuta con `supabase db reset`. No usar en producción.
 -- =============================================================================
 
@@ -34,7 +37,8 @@ from (values
   ('b1000000-0000-4000-8000-000000000002'::uuid, 'recepcion@estudioaurora.com', 'Paula Gómez'),
   ('b1000000-0000-4000-8000-000000000003'::uuid, 'valeria@estudioaurora.com', 'Valeria Ríos'),
   ('b1000000-0000-4000-8000-000000000009'::uuid, 'admin@agendapro.co', 'Admin AgendaPro'),
-  ('b1000000-0000-4000-8000-000000000005'::uuid, 'owner@barberianorte.com', 'Mateo Salazar')
+  ('b1000000-0000-4000-8000-000000000005'::uuid, 'owner@barberianorte.com', 'Mateo Salazar'),
+  ('b1000000-0000-4000-8000-000000000006'::uuid, 'owner@tex.com', 'CarolinaTEX')
 ) as u(id, email, full_name)
 on conflict (id) do nothing;
 
@@ -54,25 +58,51 @@ where u.id in (
   'b1000000-0000-4000-8000-000000000002',
   'b1000000-0000-4000-8000-000000000003',
   'b1000000-0000-4000-8000-000000000009',
-  'b1000000-0000-4000-8000-000000000005'
+  'b1000000-0000-4000-8000-000000000005',
+  'b1000000-0000-4000-8000-000000000006'
 )
 on conflict do nothing;
 
 insert into public.profiles (id, full_name, email)
-select u.id, u.full_name, u.email
+select
+  u.id,
+  coalesce(u.raw_user_meta_data ->> 'full_name', split_part(u.email, '@', 1)),
+  u.email
 from auth.users u
 where u.id in (
   'b1000000-0000-4000-8000-000000000001',
   'b1000000-0000-4000-8000-000000000002',
   'b1000000-0000-4000-8000-000000000003',
   'b1000000-0000-4000-8000-000000000009',
-  'b1000000-0000-4000-8000-000000000005'
+  'b1000000-0000-4000-8000-000000000005',
+  'b1000000-0000-4000-8000-000000000006'
 )
 on conflict (id) do nothing;
 
 insert into public.platform_admins (user_id)
 values ('b1000000-0000-4000-8000-000000000009')
 on conflict do nothing;
+
+-- -----------------------------------------------------------------------------
+-- Reejecutable: si el seed ya se ejecutó parcialmente, limpiamos solo las
+-- organizaciones de demostración (todas sus tablas hijas usan ON DELETE CASCADE).
+-- Los usuarios de auth y sus perfiles se conservan.
+-- El trigger protect_last_owner se desactiva únicamente durante esta limpieza
+-- y se recrea idéntico justo después.
+-- -----------------------------------------------------------------------------
+drop trigger if exists organization_members_protect_owner on public.organization_members;
+
+delete from public.organizations
+where id in (
+  'a1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000002',
+  'a1000000-0000-4000-8000-000000000003'
+)
+or slug in ('estudio-aurora', 'barberia-norte', 'tex');
+
+create trigger organization_members_protect_owner
+before update or delete on public.organization_members
+for each row execute function public.protect_last_owner();
 
 -- -----------------------------------------------------------------------------
 -- Organización demo principal
@@ -277,7 +307,7 @@ select
   gen_random_uuid(),
   'a1000000-0000-4000-8000-000000000001',
   ('f1000000-0000-4000-8000-0000000000' || lpad((((d + 30) % 12) + 1)::text, 2, '0'))::uuid,
-  svc.service_id,
+  svc.id,
   emp.employee_id,
   slot.start_local at time zone 'America/Bogota',
   (slot.start_local + make_interval(mins => svc.duration_minutes + svc.buffer_minutes)) at time zone 'America/Bogota',
@@ -315,7 +345,7 @@ cross join lateral (
 ) as emp(employee_index, employee_id, service_id)
 cross join lateral (
   select
-    ((current_date + d)::timestamp + (case when e.id = emp.employee_id then time '09:00' else time '09:00' end) + make_interval(hours => slot_index * 3)) as start_local,
+    ((current_date + d)::timestamp + time '09:00' + make_interval(hours => slot_index * 3)) as start_local,
     slot_index
   from (values (0), (1)) as s(slot_index)
 ) as slot
@@ -428,4 +458,61 @@ values ('a1000000-0000-4000-8000-000000000002', 'c1000000-0000-4000-8000-0000000
 
 insert into public.business_hours (organization_id, weekday, is_open, open_time, close_time)
 select 'a1000000-0000-4000-8000-000000000002', d, d <> 0, '10:00', '19:00'
+from generate_series(0, 6) as d;
+
+-- -----------------------------------------------------------------------------
+-- Tercera empresa (ejemplo de sitio propio por negocio: /reservar/tex)
+-- -----------------------------------------------------------------------------
+insert into public.organizations (
+  id, name, slug, description, logo_url, phone, email, address, city, timezone, currency
+) values (
+  'a1000000-0000-4000-8000-000000000003',
+  'Tex Studio',
+  'tex',
+  'Estudio de diseño y confección: camisería, ajustes y prendas a medida.',
+  null,
+  '+57 601 555 0199',
+  'hola@texstudio.com',
+  'Carrera 12 # 72-18',
+  'Medellín',
+  'America/Bogota',
+  'COP'
+);
+
+insert into public.organization_settings (
+  organization_id, brand_primary, brand_secondary, brand_accent, theme_preset, public_about
+) values (
+  'a1000000-0000-4000-8000-000000000003', '#7C3AED', '#DB2777', '#F59E0B', 'midnight',
+  'En Tex Studio confeccionamos piezas únicas con atención al detalle y atención por cita.'
+);
+
+insert into public.organization_members (organization_id, user_id, role)
+values ('a1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000006', 'owner');
+
+insert into public.employees (id, organization_id, user_id, full_name, position, specialties, color)
+values (
+  'c1000000-0000-4000-8000-000000000006',
+  'a1000000-0000-4000-8000-000000000003',
+  'b1000000-0000-4000-8000-000000000006',
+  'CarolinaTEX',
+  'Diseñadora y sastre',
+  array['Camisería', 'Ajustes', 'A medida'],
+  '#7C3AED'
+);
+
+insert into public.service_categories (id, organization_id, name, color)
+values ('d1000000-0000-4000-8000-000000000005', 'a1000000-0000-4000-8000-000000000003', 'Confección', '#7C3AED');
+
+insert into public.services (id, organization_id, category_id, name, price, duration_minutes, color)
+values
+  ('e1000000-0000-4000-8000-000000000008', 'a1000000-0000-4000-8000-000000000003', 'd1000000-0000-4000-8000-000000000005', 'Toma de medidas y asesoría', 80000, 45, '#7C3AED'),
+  ('e1000000-0000-4000-8000-000000000009', 'a1000000-0000-4000-8000-000000000003', 'd1000000-0000-4000-8000-000000000005', 'Ajuste de prenda', 45000, 30, '#DB2777');
+
+insert into public.employee_services (organization_id, employee_id, service_id)
+values
+  ('a1000000-0000-4000-8000-000000000003', 'c1000000-0000-4000-8000-000000000006', 'e1000000-0000-4000-8000-000000000008'),
+  ('a1000000-0000-4000-8000-000000000003', 'c1000000-0000-4000-8000-000000000006', 'e1000000-0000-4000-8000-000000000009');
+
+insert into public.business_hours (organization_id, weekday, is_open, open_time, close_time)
+select 'a1000000-0000-4000-8000-000000000003', d, d between 1 and 5, '09:00', '18:00'
 from generate_series(0, 6) as d;

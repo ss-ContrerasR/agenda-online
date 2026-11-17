@@ -5,7 +5,10 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cacheLife, cacheTag } from "next/cache";
 import { createSupabaseAdminClient, isAdminClientConfigured } from "@/lib/supabase/admin";
 import { DEFAULT_SETTINGS } from "@/lib/auth";
-import type { OrganizationSettingsRow } from "@/types/database";
+import type {
+  OrganizationRow,
+  OrganizationSettingsRow,
+} from "@/types/database";
 import type {
   PublicAppointmentDetails,
   PublicBookingData,
@@ -13,6 +16,24 @@ import type {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Slug público compartido por el portal de reservas y sus alias. */
+export const PUBLIC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Un negocio solo sirve su portal público mientras esté activo y al corriente
+ * con la plataforma. Se aplica al catálogo, a los metadatos y a la gestión
+ * de citas por token.
+ */
+function isPubliclyActive(
+  organization: Pick<OrganizationRow, "is_active" | "billing_status">,
+) {
+  return (
+    organization.is_active &&
+    (organization.billing_status === "active" ||
+      organization.billing_status === "trialing")
+  );
+}
 
 function withDefaults(
   organizationId: string,
@@ -36,7 +57,7 @@ export async function getPublicBookingData(
   slug: string,
 ): Promise<PublicBookingData | null> {
   if (!isAdminClientConfigured()) return null;
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null;
+  if (!PUBLIC_SLUG_PATTERN.test(slug)) return null;
 
   const admin = createSupabaseAdminClient();
 
@@ -45,10 +66,11 @@ export async function getPublicBookingData(
     .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
+    .in("billing_status", ["active", "trialing"])
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (!organization) return null;
+  if (!organization || !isPubliclyActive(organization)) return null;
 
   const [
     { data: settingsRow },
@@ -145,6 +167,7 @@ export async function getAppointmentByToken(
       .select("*")
       .eq("id", appointment.organization_id)
       .eq("is_active", true)
+      .in("billing_status", ["active", "trialing"])
       .is("deleted_at", null)
       .maybeSingle(),
     admin
@@ -170,7 +193,15 @@ export async function getAppointmentByToken(
       .order("created_at", { ascending: true }),
   ]);
 
-  if (!organization || !service || !employee || !client) return null;
+  if (
+    !organization ||
+    !isPubliclyActive(organization) ||
+    !service ||
+    !employee ||
+    !client
+  ) {
+    return null;
+  }
   if (slug && organization.slug !== slug) return null;
 
   return {
@@ -198,13 +229,16 @@ export async function getPublicOrganizationSeo(slug: string) {
   const admin = createSupabaseAdminClient();
   const { data: organization } = await admin
     .from("organizations")
-    .select("id, name, description, city, logo_url, cover_url")
+    .select(
+      "id, name, description, city, logo_url, cover_url, is_active, billing_status",
+    )
     .eq("slug", slug)
     .eq("is_active", true)
+    .in("billing_status", ["active", "trialing"])
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (!organization) return null;
+  if (!organization || !isPubliclyActive(organization)) return null;
 
   const { data: settings } = await admin
     .from("organization_settings")
@@ -224,4 +258,97 @@ export async function getPublicOrganizationSeo(slug: string) {
     logoUrl: organization.logo_url,
     coverUrl: organization.cover_url,
   };
+}
+
+/** Datos de un negocio para el directorio público de la plataforma. */
+export type PublicOrganizationCard = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  city: string | null;
+  country: string | null;
+  serviceCount: number;
+  categories: string[];
+};
+
+/**
+ * Directorio público de negocios activos. Dos consultas adicionales (servicios
+ * y categorías) permiten el conteo y los filtros sin hacer una consulta por
+ * negocio. Se etiqueta para invalidar el directorio al activar/suspender un
+ * negocio o al cambiar sus servicios.
+ */
+export async function listPublicOrganizations(): Promise<
+  PublicOrganizationCard[]
+> {
+  "use cache";
+  cacheTag("public-organizations", "public-directory");
+  cacheLife("minutes");
+
+  if (!isAdminClientConfigured()) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data: organizations } = await admin
+    .from("organizations")
+    .select("id, name, slug, description, logo_url, city, country")
+    .eq("is_active", true)
+    .in("billing_status", ["active", "trialing"])
+    .is("deleted_at", null)
+    .order("name", { ascending: true });
+
+  if (!organizations?.length) return [];
+
+  const organizationIds = organizations.map((organization) => organization.id);
+
+  const [{ data: services }, { data: categories }] = await Promise.all([
+    admin
+      .from("services")
+      .select("organization_id, category_id")
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .in("organization_id", organizationIds),
+    admin
+      .from("service_categories")
+      .select("id, name, organization_id")
+      .is("deleted_at", null)
+      .in("organization_id", organizationIds),
+  ]);
+
+  const categoryNames = new Map(
+    (categories ?? []).map((category) => [category.id, category.name]),
+  );
+  const serviceCounts = new Map<string, number>();
+  const categoryNamesByOrg = new Map<string, Set<string>>();
+
+  for (const service of services ?? []) {
+    serviceCounts.set(
+      service.organization_id,
+      (serviceCounts.get(service.organization_id) ?? 0) + 1,
+    );
+
+    const categoryName = service.category_id
+      ? categoryNames.get(service.category_id)
+      : undefined;
+    if (!categoryName) continue;
+
+    const names =
+      categoryNamesByOrg.get(service.organization_id) ?? new Set<string>();
+    names.add(categoryName);
+    categoryNamesByOrg.set(service.organization_id, names);
+  }
+
+  return organizations.map((organization) => ({
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    description: organization.description,
+    logoUrl: organization.logo_url,
+    city: organization.city,
+    country: organization.country,
+    serviceCount: serviceCounts.get(organization.id) ?? 0,
+    categories: Array.from(
+      categoryNamesByOrg.get(organization.id) ?? [],
+    ).sort((a, b) => a.localeCompare(b, "es")),
+  }));
 }

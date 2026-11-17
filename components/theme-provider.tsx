@@ -62,6 +62,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // localStorage puede no estar disponible (modo privado, etc.).
     }
+    // Inicialización en cliente para evitar desajustes de hidratación: el
+    // tema guardado solo existe en localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(stored);
     setResolvedTheme(applyTheme(stored));
   }, []);
