@@ -78,6 +78,16 @@ export function getActionError(error: unknown): string {
   const raw = errorMessage(error);
   if (!raw) return "Ocurrió un error inesperado. Inténtalo de nuevo.";
 
+  if (/row-level security|42501|42503/i.test(raw)) {
+    return "No tienes permisos para guardar este horario.";
+  }
+  if (/violates foreign key constraint|23503/i.test(raw)) {
+    return "El profesional seleccionado ya no está disponible.";
+  }
+  if (/violates check constraint|23514/i.test(raw)) {
+    return "Revisa los horarios: la hora final debe ser mayor a la inicial.";
+  }
+
   if (/duplicate key|unique constraint/i.test(raw)) {
     if (/profiles/i.test(raw)) {
       return "Ya existe un perfil con ese correo o identificador. Usa 'Usuario existente' para vincularlo.";

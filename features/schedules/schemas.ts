@@ -7,16 +7,21 @@ import {
   uuidField,
 } from "@/lib/form";
 
+// PostgreSQL `time` devuelve "09:00:00". El input HTML usa "09:00": aceptamos
+// ambos formatos y normalizamos a HH:mm antes de validar rangos y de guardar.
 const timeValue = z
   .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida");
+  .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Hora inválida")
+  .transform((value) => value.slice(0, 5));
 const weekdayField = z.coerce.number().int().min(0).max(6);
 const nullableTime = z
   .union([timeValue, z.literal("")])
-  .transform((value) => (value === "" ? null : value));
+  .optional()
+  .transform((value) => (value ? value : null));
 const nullableUuid = z
   .union([uuidField, z.literal("")])
-  .transform((value) => (value === "" ? null : value));
+  .optional()
+  .transform((value) => (value ? value : null));
 
 export const businessHoursSchema = z
   .object({
@@ -58,6 +63,7 @@ export const employeeScheduleSchema = z
 
 export const scheduleBreakSchema = z
   .object({
+    breakId: nullableUuid,
     employee_id: nullableUuid,
     weekday: weekdayField,
     start_time: timeValue,

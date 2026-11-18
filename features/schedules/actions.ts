@@ -35,19 +35,43 @@ function invalid(
   };
 }
 
+/**
+ * Los horarios pueden apuntar a un profesional, pero siempre debe pertenecer a
+ * la organización de la sesión. Sin esta comprobación un id manipulado podría
+ * producir un error de RLS o de llave foránea difícil de entender.
+ */
+async function assertEmployeeInOrganization(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  organizationId: string,
+  employeeId: string | null,
+) {
+  if (!employeeId) return;
+  const { data, error } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("El profesional seleccionado no pertenece a esta empresa.");
+}
+
 export async function saveBusinessHoursAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  // `redirect()` lanza NEXT_REDIRECT: debe ejecutarse fuera del try/catch.
+  const session = await requirePermission("schedules:write");
   const parsed = businessHoursSchema.safeParse(parseScheduleForm(formData));
   if (!parsed.success) return invalid("Revisa el horario del día.", parsed.error.issues);
 
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
+    const organizationId = session.membership.organization_id;
     const { error } = await supabase.from("business_hours").upsert(
       {
-        organization_id: session.membership.organization_id,
+        organization_id: organizationId,
         ...parsed.data,
       },
       { onConflict: "organization_id,weekday" },
@@ -55,7 +79,7 @@ export async function saveBusinessHoursAction(
     if (error) throw error;
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
       action: "business_hours.updated",
       entity: "business_hours",
@@ -72,15 +96,18 @@ export async function saveEmployeeScheduleAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
   const parsed = employeeScheduleSchema.safeParse(parseScheduleForm(formData));
   if (!parsed.success) return invalid("Revisa el horario del profesional.", parsed.error.issues);
 
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
+    const organizationId = session.membership.organization_id;
+    await assertEmployeeInOrganization(supabase, organizationId, parsed.data.employee_id);
+
     const { error } = await supabase.from("employee_schedules").upsert(
       {
-        organization_id: session.membership.organization_id,
+        organization_id: organizationId,
         ...parsed.data,
       },
       { onConflict: "employee_id,weekday" },
@@ -88,7 +115,7 @@ export async function saveEmployeeScheduleAction(
     if (error) throw error;
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
       action: "employee_schedule.updated",
       entity: "employee_schedules",
@@ -107,18 +134,20 @@ export async function saveEmployeeScheduleAction(
 export async function deleteEmployeeScheduleAction(
   scheduleId: string,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
+
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
+    const organizationId = session.membership.organization_id;
     const { error } = await supabase
       .from("employee_schedules")
       .delete()
       .eq("id", scheduleId)
-      .eq("organization_id", session.membership.organization_id);
+      .eq("organization_id", organizationId);
     if (error) throw error;
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
       action: "employee_schedule.deleted",
       entity: "employee_schedules",
@@ -131,31 +160,51 @@ export async function deleteEmployeeScheduleAction(
   }
 }
 
-export async function createScheduleBreakAction(
+/** Crea o actualiza un descanso (almuerzo, pausa, etc.). */
+export async function saveScheduleBreakAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
   const parsed = scheduleBreakSchema.safeParse(parseScheduleForm(formData));
   if (!parsed.success) return invalid("Revisa los datos del descanso.", parsed.error.issues);
 
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("schedule_breaks").insert({
-      organization_id: session.membership.organization_id,
-      ...parsed.data,
-    });
-    if (error) throw error;
+    const organizationId = session.membership.organization_id;
+    const { breakId, ...values } = parsed.data;
+    await assertEmployeeInOrganization(supabase, organizationId, values.employee_id);
+
+    if (breakId) {
+      const { data, error } = await supabase
+        .from("schedule_breaks")
+        .update(values)
+        .eq("id", breakId)
+        .eq("organization_id", organizationId)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("No encontramos ese descanso.");
+    } else {
+      const { error } = await supabase
+        .from("schedule_breaks")
+        .insert({ organization_id: organizationId, ...values });
+      if (error) throw error;
+    }
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
-      action: "schedule_break.created",
+      action: breakId ? "schedule_break.updated" : "schedule_break.created",
       entity: "schedule_breaks",
-      metadata: { weekday: parsed.data.weekday },
+      entityId: breakId,
+      metadata: { weekday: values.weekday },
     });
     revalidateSchedules();
-    return { ok: true, message: "Descanso agregado." };
+    return {
+      ok: true,
+      message: breakId ? "Descanso actualizado." : "Descanso agregado.",
+    };
   } catch (error) {
     return { ok: false, error: getActionError(error) };
   }
@@ -164,18 +213,20 @@ export async function createScheduleBreakAction(
 export async function deleteScheduleBreakAction(
   breakId: string,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
+
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
+    const organizationId = session.membership.organization_id;
     const { error } = await supabase
       .from("schedule_breaks")
       .delete()
       .eq("id", breakId)
-      .eq("organization_id", session.membership.organization_id);
+      .eq("organization_id", organizationId);
     if (error) throw error;
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
       action: "schedule_break.deleted",
       entity: "schedule_breaks",
@@ -192,14 +243,15 @@ export async function saveScheduleExceptionAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
   const parsed = scheduleExceptionSchema.safeParse(parseScheduleForm(formData));
   if (!parsed.success) return invalid("Revisa los datos de la excepción.", parsed.error.issues);
 
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
     const organizationId = session.membership.organization_id;
     const { exceptionId, ...values } = parsed.data;
+    await assertEmployeeInOrganization(supabase, organizationId, values.employee_id);
 
     if (exceptionId) {
       const { data, error } = await supabase
@@ -243,18 +295,20 @@ export async function saveScheduleExceptionAction(
 export async function deleteScheduleExceptionAction(
   exceptionId: string,
 ): Promise<ActionResult> {
+  const session = await requirePermission("schedules:write");
+
   try {
-    const session = await requirePermission("schedules:write");
     const supabase = await createSupabaseServerClient();
+    const organizationId = session.membership.organization_id;
     const { error } = await supabase
       .from("schedule_exceptions")
       .delete()
       .eq("id", exceptionId)
-      .eq("organization_id", session.membership.organization_id);
+      .eq("organization_id", organizationId);
     if (error) throw error;
 
     await auditAction({
-      organizationId: session.membership.organization_id,
+      organizationId,
       userId: session.user.id,
       action: "schedule_exception.deleted",
       entity: "schedule_exceptions",

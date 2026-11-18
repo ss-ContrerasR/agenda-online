@@ -5,6 +5,7 @@
 ### Base
 - [x] Inspección del proyecto (Next.js 16.4.5, React 19, Tailwind 4, TS estricto).
 - [x] Dependencias base: Supabase, Zod, RHF, Recharts, Radix/shadcn, date-fns, Resend, Vitest.
+- [x] Envío de correo con Brevo (gratis, sin dominio propio) y Resend como alternativa.
 - [x] Esquema PostgreSQL + RLS + funciones + triggers + índices.
 - [x] Autenticación, organizaciones, onboarding y permisos por rol.
 - [x] Design system, layout del panel y tema por organización.
@@ -27,7 +28,7 @@
 - [x] Superadmin de plataforma (empresas, licencias, usuarios, auditoría).
 - [x] Reserva pública en `/reservar/[slug]` + gestión por token seguro.
 - [x] Directorio público de negocios en `/negocios`.
-- [x] Notificaciones por Resend (solo si hay credenciales) y arquitectura lista para WhatsApp.
+- [x] Notificaciones por Brevo o Resend (solo si hay credenciales) y arquitectura lista para WhatsApp.
 - [x] Notificaciones internas por empleado (`metadata.employee_user_id` + RLS),
       aviso flotante rediseñado con acciones y panel filtrado para empleados.
 - [x] Correos personalizables con React Email: editor de diseño (logo, colores,
@@ -61,7 +62,7 @@
 ## Pendiente
 - [ ] Ampliar pruebas automatizadas (Vitest): disponibilidad, rangos de fecha,
       permisos, schemas, conflictos/duplicados, cancelación y reprogramación.
-- [ ] Configurar credenciales reales de Resend en producción.
+- [ ] Configurar credenciales reales de Brevo (recomendado, gratis) o Resend en producción.
 - [ ] Integración de WhatsApp (la arquitectura ya está preparada).
 
 ## Decisiones técnicas
@@ -91,5 +92,11 @@
 - Si el seed ya se había ejecutado, el superadmin conserva el correo anterior;
   actualizarlo en Supabase Auth o resetear la base para usar
   `admin@agendatex.co`.
-- Sin credenciales de Resend las notificaciones quedan como `skipped`; nunca se
-  simula el envío.
+- Sin credenciales de Brevo ni Resend las notificaciones quedan como `skipped`;
+  nunca se simula el envío.
+- Brevo no requiere dominio propio: basta verificar el correo remitente en
+  **Senders**. Configura `BREVO_API_KEY` y `BREVO_FROM_EMAIL`; si ambos existen,
+  Brevo tiene prioridad sobre Resend.
+- Brevo puede bloquear la API por IP (`unrecognised IP address`). Autoriza la IP
+  del servidor en **Security → Authorised IPs** o desactiva **Block unknown IP
+  addresses**. En producción usa una IP de salida fija.

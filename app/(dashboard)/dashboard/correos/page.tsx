@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { isEmailConfigured } from "@/lib/notifications/email";
+import {
+  getEmailProviderInfo,
+  isEmailConfigured,
+} from "@/lib/notifications/email";
 import { getEmailStudioData } from "@/features/email/queries";
 import { EmailStudio } from "@/features/email/components/email-studio";
 import { PageHeader } from "@/components/shared/page-header";
@@ -30,6 +33,7 @@ export default async function EmailsPage() {
         canSend={can(session.membership.role, "email:send")}
         isOwner={session.membership.role === "owner"}
         emailConfigured={isEmailConfigured()}
+        emailProvider={getEmailProviderInfo()}
       />
     </div>
   );

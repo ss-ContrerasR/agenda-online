@@ -2,11 +2,11 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coffee, Plus, Trash2 } from "lucide-react";
+import { Coffee, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  createScheduleBreakAction,
   deleteScheduleBreakAction,
+  saveScheduleBreakAction,
 } from "@/features/schedules/actions";
 import { WEEKDAYS, weekdayLabel } from "@/features/schedules/constants";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -42,34 +42,39 @@ import {
 } from "@/components/ui/table";
 
 function ScheduleBreakForm({
+  breakItem,
   employees,
   onSuccess,
   onCancel,
 }: {
+  breakItem?: ScheduleBreakRow;
   employees: EmployeeRow[];
   onSuccess?: () => void;
   onCancel?: () => void;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
-    createScheduleBreakAction,
+    saveScheduleBreakAction,
     initialActionState,
   );
-  const [employeeId, setEmployeeId] = useState("");
-  const [weekday, setWeekday] = useState("1");
+  const [employeeId, setEmployeeId] = useState(breakItem?.employee_id ?? "");
+  const [weekday, setWeekday] = useState(String(breakItem?.weekday ?? 1));
 
   useEffect(() => {
     if (!state.ok) {
-      if (state.error) toast.error(state.error);
+      if (state.error && !state.fieldErrors) toast.error(state.error);
       return;
     }
-    toast.success(state.message ?? "Descanso agregado");
+    toast.success(state.message ?? "Descanso guardado");
     router.refresh();
     onSuccess?.();
   }, [state, router, onSuccess]);
 
   return (
     <form action={formAction} className="space-y-4">
+      {breakItem ? (
+        <input type="hidden" name="breakId" value={breakItem.id} />
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Día *</Label>
@@ -110,11 +115,23 @@ function ScheduleBreakForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="break_start">Desde *</Label>
-          <Input id="break_start" name="start_time" type="time" required defaultValue="13:00" />
+          <Input
+            id="break_start"
+            name="start_time"
+            type="time"
+            required
+            defaultValue={(breakItem?.start_time ?? "13:00").slice(0, 5)}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="break_end">Hasta *</Label>
-          <Input id="break_end" name="end_time" type="time" required defaultValue="14:00" />
+          <Input
+            id="break_end"
+            name="end_time"
+            type="time"
+            required
+            defaultValue={(breakItem?.end_time ?? "14:00").slice(0, 5)}
+          />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="break_label">Etiqueta</Label>
@@ -122,7 +139,7 @@ function ScheduleBreakForm({
             id="break_label"
             name="label"
             placeholder="Ej. Almuerzo"
-            defaultValue="Almuerzo"
+            defaultValue={breakItem?.label ?? "Almuerzo"}
           />
         </div>
       </div>
@@ -138,10 +155,50 @@ function ScheduleBreakForm({
           </Button>
         ) : null}
         <Button type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Agregar descanso"}
+          {pending ? "Guardando…" : breakItem ? "Guardar descanso" : "Agregar descanso"}
         </Button>
       </div>
     </form>
+  );
+}
+
+function ScheduleBreakDialog({
+  breakItem,
+  employees,
+  trigger,
+}: {
+  breakItem?: ScheduleBreakRow;
+  employees: EmployeeRow[];
+  trigger?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger ?? (
+          <Button size="sm">
+            <Plus className="size-4" /> Nuevo descanso
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {breakItem ? "Editar descanso" : "Nuevo descanso"}
+          </DialogTitle>
+          <DialogDescription>
+            Define un rango horario en el que no se tomarán reservas. Puede aplicar
+            a todo el equipo o solo a un profesional.
+          </DialogDescription>
+        </DialogHeader>
+        <ScheduleBreakForm
+          breakItem={breakItem}
+          employees={employees}
+          onSuccess={() => setOpen(false)}
+          onCancel={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -154,37 +211,16 @@ export function ScheduleBreaks({
   breaks: ScheduleBreakRow[];
   canWrite: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const employeeName = new Map(employees.map((item) => [item.id, item.full_name]));
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Bloques no reservables. Se aplican a todos o a un profesional específico.
+          Bloques no reservables, por ejemplo el almuerzo de una persona o de todo
+          el equipo.
         </p>
-        {canWrite ? (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="size-4" /> Nuevo descanso
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Nuevo descanso</DialogTitle>
-                <DialogDescription>
-                  Define un rango horario en el que no se tomarán reservas.
-                </DialogDescription>
-              </DialogHeader>
-              <ScheduleBreakForm
-                employees={employees}
-                onSuccess={() => setOpen(false)}
-                onCancel={() => setOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        ) : null}
+        {canWrite ? <ScheduleBreakDialog employees={employees} /> : null}
       </div>
 
       {breaks.length === 0 ? (
@@ -213,7 +249,7 @@ export function ScheduleBreaks({
                   <TableRow key={item.id}>
                     <TableCell>{weekdayLabel(item.weekday)}</TableCell>
                     <TableCell className="tabular-nums">
-                      {item.start_time} – {item.end_time}
+                      {item.start_time.slice(0, 5)} – {item.end_time.slice(0, 5)}
                     </TableCell>
                     <TableCell>{item.label ?? "Descanso"}</TableCell>
                     <TableCell>
@@ -227,7 +263,16 @@ export function ScheduleBreaks({
                     </TableCell>
                     {canWrite ? (
                       <TableCell>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-1">
+                          <ScheduleBreakDialog
+                            breakItem={item}
+                            employees={employees}
+                            trigger={
+                              <Button variant="ghost" size="icon-sm" aria-label="Editar descanso">
+                                <Pencil className="size-4" />
+                              </Button>
+                            }
+                          />
                           <ConfirmDialog
                             trigger={
                               <Button

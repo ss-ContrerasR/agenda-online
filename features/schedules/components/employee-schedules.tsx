@@ -63,7 +63,7 @@ function EmployeeScheduleForm({
 
   useEffect(() => {
     if (!state.ok) {
-      if (state.error) toast.error(state.error);
+      if (state.error && !state.fieldErrors) toast.error(state.error);
       return;
     }
     toast.success(state.message ?? "Horario guardado");
@@ -123,7 +123,7 @@ function EmployeeScheduleForm({
             name="start_time"
             type="time"
             required
-            defaultValue={schedule?.start_time ?? "09:00"}
+            defaultValue={(schedule?.start_time ?? "09:00").slice(0, 5)}
           />
         </div>
         <div className="space-y-1.5">
@@ -133,7 +133,7 @@ function EmployeeScheduleForm({
             name="end_time"
             type="time"
             required
-            defaultValue={schedule?.end_time ?? "18:00"}
+            defaultValue={(schedule?.end_time ?? "18:00").slice(0, 5)}
           />
         </div>
       </div>
@@ -248,7 +248,7 @@ export function EmployeeSchedules({
                     </TableCell>
                     <TableCell>{weekdayLabel(schedule.weekday)}</TableCell>
                     <TableCell className="tabular-nums">
-                      {schedule.start_time} – {schedule.end_time}
+                      {schedule.start_time.slice(0, 5)} – {schedule.end_time.slice(0, 5)}
                     </TableCell>
                     <TableCell>
                       {schedule.is_working ? (

@@ -31,7 +31,7 @@ function BusinessHoursRow({
 
   useEffect(() => {
     if (!state.ok) {
-      if (state.error) toast.error(state.error);
+      if (state.error && !state.fieldErrors) toast.error(state.error);
       return;
     }
     toast.success(state.message ?? "Horario guardado");
@@ -78,7 +78,7 @@ function BusinessHoursRow({
                 type="time"
                 required
                 disabled={!canWrite}
-                defaultValue={row?.open_time ?? "09:00"}
+                defaultValue={(row?.open_time ?? "09:00").slice(0, 5)}
               />
             </div>
             <div className="space-y-1">
@@ -91,7 +91,7 @@ function BusinessHoursRow({
                 type="time"
                 required
                 disabled={!canWrite}
-                defaultValue={row?.close_time ?? "18:00"}
+                defaultValue={(row?.close_time ?? "18:00").slice(0, 5)}
               />
             </div>
           </div>
@@ -106,7 +106,7 @@ function BusinessHoursRow({
                 name="break_start"
                 type="time"
                 disabled={!canWrite}
-                defaultValue={row?.break_start ?? ""}
+                defaultValue={(row?.break_start ?? "").slice(0, 5)}
               />
             </div>
             <div className="space-y-1">
@@ -118,7 +118,7 @@ function BusinessHoursRow({
                 name="break_end"
                 type="time"
                 disabled={!canWrite}
-                defaultValue={row?.break_end ?? ""}
+                defaultValue={(row?.break_end ?? "").slice(0, 5)}
               />
             </div>
           </div>

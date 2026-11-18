@@ -60,6 +60,7 @@ type EmailStudioProps = {
   canSend: boolean;
   isOwner: boolean;
   emailConfigured: boolean;
+  emailProvider: { id: string; label: string } | null;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -185,6 +186,7 @@ export function EmailStudio({
   canSend,
   isOwner,
   emailConfigured,
+  emailProvider,
 }: EmailStudioProps) {
   const router = useRouter();
   const [config, setConfig] = useState<EmailTemplateConfig>(template);
@@ -419,7 +421,9 @@ export function EmailStudio({
                       />
                       <p className="text-xs text-muted-foreground">
                         {isOwner
-                          ? "Si el dominio no está verificado en Resend, se usará como “Responder a”."
+                          ? emailProvider?.id === "brevo"
+                            ? "Debe ser un remitente verificado en Brevo (no necesitas dominio propio). Si no coincide, se usará como “Responder a”."
+                            : "Si el dominio no está verificado en Resend, se usará como “Responder a”."
                           : "Solo el propietario puede cambiar la dirección de envío."}
                       </p>
                       <FieldError message={saveState.fieldErrors?.sender_email} />
@@ -579,13 +583,31 @@ export function EmailStudio({
             </CardHeader>
             <CardContent className="space-y-4">
               {!emailConfigured ? (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <p>
-                    El envío no está configurado: falta <code>RESEND_API_KEY</code>{" "}
-                    en el servidor. Puedes guardar el diseño y enviar cuando esté
-                    disponible.
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <p className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                      El envío aún no está configurado. Puedes guardar el diseño y
+                      activarlo cuando quieras.
+                    </span>
                   </p>
+                  <div className="mt-2 pl-6">
+                    <p className="font-medium">
+                      Opción gratuita sin dominio propio: Brevo
+                    </p>
+                    <ol className="mt-1 list-decimal space-y-1 pl-4 text-xs">
+                      <li>Crea una cuenta gratis en brevo.com.</li>
+                      <li>Verifica tu correo en Senders y define el remitente.</li>
+                      <li>
+                        Añade <code>BREVO_API_KEY</code> y{" "}
+                        <code>BREVO_FROM_EMAIL</code> en el servidor.
+                      </li>
+                    </ol>
+                    <p className="mt-2 text-xs">
+                      Incluye 300 correos al día. También puedes usar{" "}
+                      <code>RESEND_API_KEY</code> con un dominio verificado.
+                    </p>
+                  </div>
                 </div>
               ) : null}
 
@@ -600,14 +622,40 @@ export function EmailStudio({
               ) : null}
 
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-                <p className="flex items-center gap-1.5 font-medium">
-                  <Mail className="size-4" />
-                  Remitente
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <Mail className="size-4" />
+                    Remitente
+                  </p>
+                  {emailProvider ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        emailProvider.id === "brevo"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                          : "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
+                      )}
+                    >
+                      Envío con {emailProvider.label}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-muted-foreground">
                   {config.senderName ?? organizationName} ·{" "}
                   {config.senderEmail ?? "Sin correo del propietario"}
                 </p>
+                {emailProvider?.id === "brevo" ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Plan gratuito: 300 correos al día. El remitente debe estar
+                    verificado en Brevo.
+                  </p>
+                ) : null}
+                {emailProvider?.id === "resend" ? (
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                    Resend sin dominio verificado solo entrega al correo dueño de
+                    la cuenta. Para enviar a tus clientes, activa Brevo (gratis).
+                  </p>
+                ) : null}
               </div>
 
               <form ref={sendFormRef} action={sendAction} className="space-y-4">

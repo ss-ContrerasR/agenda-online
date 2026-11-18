@@ -65,7 +65,7 @@ function ScheduleExceptionForm({
 
   useEffect(() => {
     if (!state.ok) {
-      if (state.error) toast.error(state.error);
+      if (state.error && !state.fieldErrors) toast.error(state.error);
       return;
     }
     toast.success(state.message ?? "Excepción guardada");
@@ -128,7 +128,7 @@ function ScheduleExceptionForm({
             id="exception_start"
             name="start_time"
             type="time"
-            defaultValue={exception?.start_time ?? ""}
+            defaultValue={(exception?.start_time ?? "").slice(0, 5)}
           />
         </div>
         <div className="space-y-1.5">
@@ -137,7 +137,7 @@ function ScheduleExceptionForm({
             id="exception_end"
             name="end_time"
             type="time"
-            defaultValue={exception?.end_time ?? ""}
+            defaultValue={(exception?.end_time ?? "").slice(0, 5)}
           />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
@@ -279,7 +279,7 @@ export function ScheduleExceptions({
                         <Badge variant="destructive">Cerrado</Badge>
                       ) : (
                         <Badge variant="info">
-                          {exception.start_time} – {exception.end_time}
+                          {exception.start_time?.slice(0, 5)} – {exception.end_time?.slice(0, 5)}
                         </Badge>
                       )}
                     </TableCell>

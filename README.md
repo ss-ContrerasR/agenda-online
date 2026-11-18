@@ -13,7 +13,7 @@ página pública de reservas.
 - **Zod** + **React Hook Form**
 - **Recharts**, **Lucide**, **date-fns / date-fns-tz**
 - **React Email** (`@react-email/components` + `@react-email/render`) para plantillas de correo
-- **Resend** para correo (opcional)
+- **Brevo** (plan gratuito, sin dominio propio) o **Resend** para correo (opcional)
 
 ## Requisitos
 
@@ -38,13 +38,18 @@ página pública de reservas.
    NEXT_PUBLIC_APP_URL=http://localhost:3000
 
    # Opcionales
+   # Brevo: gratis y sin dominio propio (300 correos/día)
+   BREVO_API_KEY=
+   BREVO_FROM_EMAIL=AgendaTEX <tu-correo-verificado@gmail.com>
+   # Alternativa con dominio verificado
    RESEND_API_KEY=
    RESEND_FROM_EMAIL=AgendaTEX <no-reply@tudominio.com>
    NEXT_PUBLIC_PLATFORM_WHATSAPP_NUMBER=
    ```
 
-   Sin `RESEND_API_KEY` las notificaciones quedan en estado `skipped`; la app
-   nunca simula envíos.
+   Si Brevo está configurado se usa como proveedor principal; Resend queda como
+   alternativa. Sin ninguno de los dos, las notificaciones quedan en estado
+   `skipped`; la app nunca simula envíos.
 
 3. Aplica el esquema y el seed:
 
@@ -131,11 +136,22 @@ mostrarle únicamente sus propias citas y avisos.
   Email**, renderizado en el servidor. No hay HTML duplicado entre la vista
   previa y el envío.
 - El remitente es el correo del propietario (miembro `owner` → `profiles.email`).
-  Si su dominio coincide con `RESEND_FROM_EMAIL`, se usa como `from`; si no,
-  Resend exige un dominio verificado, así que se envía desde el remitente de la
-  plataforma y el correo del propietario se usa como `reply_to`.
-- Sin `RESEND_API_KEY` el envío devuelve `skipped` y la UI lo explica; nunca se
-  simula un envío. Cada intento queda registrado en `notifications`.
+  Si su dominio coincide con `BREVO_FROM_EMAIL` (o `RESEND_FROM_EMAIL`), se usa
+  como `from`; si no, se envía desde el remitente verificado de la plataforma y
+  el correo del propietario se usa como `reply_to`.
+- **Brevo** es la opción recomendada sin dominio propio: permite verificar un
+  correo individual y enviar a cualquier destinatario con 300 correos/día
+  gratis. Crea la cuenta en [brevo.com](https://www.brevo.com), verifica el
+  remitente en **Senders**, genera una API key y define `BREVO_API_KEY` y
+  `BREVO_FROM_EMAIL`.
+- Si Brevo responde `unrecognised IP address`, autoriza la IP del servidor en
+  [Security → Authorised IPs](https://app.brevo.com/security/authorised_ips) o
+  desactiva **Block unknown IP addresses**. En producción conviene usar una IP
+  de salida fija, porque las IPs dinámicas cambian y Brevo las bloquea.
+- **Resend** sigue disponible como alternativa, pero para enviar a terceros
+  exige un dominio verificado.
+- Sin proveedor configurado el envío devuelve `skipped` y la UI lo explica;
+  nunca se simula un envío. Cada intento queda registrado en `notifications`.
 
 ## Rendimiento
 

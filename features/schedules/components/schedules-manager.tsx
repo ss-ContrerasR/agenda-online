@@ -44,7 +44,7 @@ export function SchedulesManager({
           <CalendarClock /> Descansos
         </TabsTrigger>
         <TabsTrigger value="exceptions">
-          <CalendarOff /> Excepciones
+          <CalendarOff /> Festivos y fechas especiales
         </TabsTrigger>
       </TabsList>
 

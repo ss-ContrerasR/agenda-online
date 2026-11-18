@@ -236,7 +236,7 @@ export async function sendCustomEmailAction(
       ok: false,
       error:
         result.status === "skipped"
-          ? "El envío de correos no está configurado. Define RESEND_API_KEY en el servidor."
+          ? "El envío de correos no está configurado. Define BREVO_API_KEY y BREVO_FROM_EMAIL (plan gratuito sin dominio propio) o RESEND_API_KEY en el servidor."
           : `No se pudo enviar el correo: ${result.error ?? "error desconocido"}`,
     };
   } catch (error) {
