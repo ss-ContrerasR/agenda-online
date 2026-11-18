@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { UserRound, UsersRound } from "lucide-react";
+import { ShieldCheck, UserRound, UserRoundPlus, UsersRound } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { can } from "@/lib/permissions";
-import { getEmployeesData } from "@/features/employees/queries";
+import {
+  getEmployeeCandidates,
+  getEmployeesData,
+} from "@/features/employees/queries";
 import {
   DeleteEmployeeButton,
   EditEmployeeButton,
@@ -46,6 +49,12 @@ export default async function EmployeesPage({
   );
 
   const canWrite = can(session.membership.role, "employees:write");
+  const candidates = canWrite
+    ? await getEmployeeCandidates(
+        supabase,
+        session.membership.organization_id,
+      )
+    : [];
   const serviceName = new Map(services.map((service) => [service.id, service.name]));
   const linksByEmployee = new Map<string, string[]>();
   for (const link of links) {
@@ -61,19 +70,28 @@ export default async function EmployeesPage({
     <div className="space-y-6">
       <PageHeader
         title="Equipo"
-        description="Gestiona los profesionales, sus especialidades y los servicios que pueden atender."
+        description="Agrega personal a partir de las cuentas con rol Empleado y define qué servicios puede atender cada profesional."
         actions={
-          canWrite ? <EmployeeFormDialog services={services} /> : null
+          canWrite ? (
+            <EmployeeFormDialog candidates={candidates} services={services} />
+          ) : null
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Profesionales" value={employees.length} icon={UsersRound} />
         <StatCard label="Activos" value={activeCount} icon={UserRound} />
         <StatCard
-          label="Servicios en catálogo"
-          value={services.length}
-          hint="Disponibles para asignar"
+          label="Cuentas por agregar"
+          value={candidates.length}
+          icon={UserRoundPlus}
+          hint="Con rol Empleado, sin ficha"
+        />
+        <StatCard
+          label="Con acceso al panel"
+          value={employees.filter((employee) => employee.user_id && !employee.deleted_at).length}
+          icon={ShieldCheck}
+          hint="Vinculados a una cuenta"
         />
       </div>
 
@@ -129,6 +147,12 @@ export default async function EmployeesPage({
                             <p className="truncate text-xs text-muted-foreground">
                               {employee.position ?? "Sin cargo"}
                             </p>
+                            <Badge
+                              variant={employee.user_id ? "success" : "outline"}
+                              className="mt-1 font-normal"
+                            >
+                              {employee.user_id ? "Con acceso" : "Sin cuenta"}
+                            </Badge>
                           </div>
                         </div>
                       </TableCell>

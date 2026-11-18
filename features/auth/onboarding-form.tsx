@@ -57,7 +57,8 @@ export function OnboardingForm({
           Configura tu negocio
         </h1>
         <p className="text-sm text-muted-foreground">
-          Crea el espacio de {email}. Podrás completar el resto en configuración.
+          Crea el espacio de {email}. Tu negocio arranca con 7 días de prueba y
+          todas las funciones disponibles; la fecha de pago aparecerá en tu panel.
         </p>
       </div>
 

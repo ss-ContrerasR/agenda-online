@@ -22,6 +22,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { AppImage } from "@/components/shared/app-image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -74,10 +75,12 @@ function FormSelect({
 function ImagePreview({ url, alt }: { url: string; alt: string }) {
   if (!url) return null;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <AppImage
       src={url}
       alt={alt}
+      width={640}
+      height={112}
+      sizes="(min-width: 768px) 640px, 100vw"
       className="mt-2 h-28 w-full rounded-lg border border-border object-cover"
     />
   );

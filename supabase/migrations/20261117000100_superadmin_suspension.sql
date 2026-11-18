@@ -1,5 +1,5 @@
 -- =============================================================================
--- AgendaPro — Superadministrador, suspensión de usuarios y facturación
+-- AgendaTEX — Superadministrador, suspensión de usuarios y facturación
 -- Ejecutar después de las migraciones base (SQL Editor o `supabase db reset`).
 -- =============================================================================
 

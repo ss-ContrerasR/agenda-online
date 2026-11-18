@@ -2,8 +2,10 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import {
   ArrowRight,
+  Bell,
   CalendarClock,
   CalendarDays,
+  CheckCheck,
   CircleDollarSign,
   Clock3,
   Plus,
@@ -14,8 +16,11 @@ import {
 import { requireSession } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolvePeriod } from "@/lib/date-range";
-import { getDashboardData } from "@/features/dashboard/queries";
-import { OverviewCharts } from "@/features/dashboard/components/overview-charts";
+import {
+  getDashboardData,
+  getEmployeeDashboardData,
+} from "@/features/dashboard/queries";
+import { OverviewCharts } from "@/features/dashboard/components/overview-charts-loader";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { PeriodFilter } from "@/components/shared/period-filter";
@@ -49,28 +54,183 @@ export default async function DashboardPage({
   const first = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value[0] : value;
 
+  const currency = session.organization.currency;
+  const timezone = session.organization.timezone;
+  const firstName =
+    session.profile?.full_name?.trim().split(/\s+/)[0] ||
+    session.user.email?.split("@")[0] ||
+    "";
+
+  if (session.membership.role === "employee") {
+    const supabase = await createSupabaseServerClient();
+    const data = await getEmployeeDashboardData(
+      supabase,
+      session.membership.organization_id,
+      timezone,
+      session.membership.employee_id,
+    );
+
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Mi agenda"
+          title={firstName ? `Hola, ${firstName}` : "Mi agenda"}
+          description={
+            data.linked
+              ? "Consulta las citas que tienes asignadas y marca su estado al terminar."
+              : "Tu cuenta ya está creada. Falta que un propietario o administrador te agregue al equipo."
+          }
+          actions={
+            data.linked ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/citas">
+                  Ver todas mis citas <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            ) : null
+          }
+        />
+
+        {!data.linked ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Tu cuenta aún no está vinculada al equipo"
+            description="Pide a un propietario o administrador que abra Equipo → Agregar personal y elija tu cuenta. En cuanto te vinculen, tus citas y notificaciones aparecerán aquí."
+          />
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Citas hoy"
+                value={formatNumber(data.todayCount)}
+                icon={CalendarDays}
+                hint="en tu agenda de hoy"
+              />
+              <StatCard
+                label="Pendientes hoy"
+                value={formatNumber(data.pendingToday)}
+                icon={CalendarClock}
+                hint="por confirmar o atender"
+              />
+              <StatCard
+                label="Completadas hoy"
+                value={formatNumber(data.completedToday)}
+                icon={CheckCheck}
+                hint="citas ya atendidas"
+              />
+              <StatCard
+                label="Próximas"
+                value={formatNumber(data.upcoming.length)}
+                icon={TrendingUp}
+                hint="pendientes o confirmadas"
+              />
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex-row items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Tus próximas citas</CardTitle>
+                    <CardDescription>
+                      Reservas pendientes y confirmadas asignadas a ti.
+                    </CardDescription>
+                  </div>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/dashboard/citas">
+                      Ver agenda <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {data.upcoming.length === 0 ? (
+                    <EmptyState
+                      icon={CalendarClock}
+                      title="No tienes próximas citas"
+                      description="Cuando te asignen una cita aparecerá aquí y en tus notificaciones."
+                      className="border-0 bg-transparent py-10"
+                    />
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {data.upcoming.map((appointment) => (
+                        <li key={appointment.id}>
+                          <Link
+                            href={`/dashboard/citas/${appointment.id}`}
+                            className="flex items-center gap-3 py-3 transition-colors hover:text-primary"
+                          >
+                            <span
+                              className="h-9 w-1 shrink-0 rounded-full"
+                              style={{ backgroundColor: appointment.employeeColor }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                {appointment.clientName}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {appointment.serviceName}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">
+                                {formatDateInTz(appointment.startsAt, timezone, "EEE d MMM")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatTimeInTz(appointment.startsAt, timezone)}
+                              </p>
+                            </div>
+                            <StatusBadge status={appointment.status} className="hidden md:inline-flex" />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Accesos rápidos</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-2">
+                  {[
+                    { label: "Mis citas", href: "/dashboard/citas", icon: CalendarDays },
+                    { label: "Notificaciones", href: "/dashboard/notificaciones", icon: Bell },
+                    { label: "Mi perfil", href: "/dashboard/perfil", icon: Users },
+                  ].map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent"
+                    >
+                      <link.icon className="size-4 text-muted-foreground" />
+                      {link.label}
+                      <ArrowRight className="ml-auto size-3.5 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   const period = resolvePeriod({
     preset: first(params.period),
     from: first(params.from),
     to: first(params.to),
-    timezone: session.organization.timezone,
+    timezone,
   });
 
   const supabase = await createSupabaseServerClient();
   const data = await getDashboardData(
     supabase,
     session.membership.organization_id,
-    session.organization.timezone,
+    timezone,
     period,
   );
 
-  const currency = session.organization.currency;
-  const timezone = session.organization.timezone;
   const canWrite = can(session.membership.role, "appointments:write");
-  const firstName =
-    session.profile?.full_name?.trim().split(/\s+/)[0] ||
-    session.user.email?.split("@")[0] ||
-    "";
 
   return (
     <div className="space-y-6">

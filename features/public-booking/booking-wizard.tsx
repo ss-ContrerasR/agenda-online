@@ -41,6 +41,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { AppImage } from "@/components/shared/app-image";
 import {
   cn,
   formatCurrency,
@@ -992,7 +993,7 @@ function EmployeeStep({
             )}
           >
             <span
-              className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground"
+              className="relative flex size-11 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground"
               style={
                 employee.photoUrl
                   ? undefined
@@ -1000,11 +1001,12 @@ function EmployeeStep({
               }
             >
               {employee.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <AppImage
                   src={employee.photoUrl}
                   alt={employee.name}
-                  className="size-full object-cover"
+                  fill
+                  sizes="44px"
+                  className="object-cover"
                 />
               ) : (
                 initials(employee.name)

@@ -210,9 +210,31 @@
   animation: subtle-in 0.35s ease-out both;
 }
 
+@keyframes notification-highlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: var(--card);
+  }
+  25%,
+  75% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 45%, transparent);
+    background-color: color-mix(in srgb, var(--warning) 7%, var(--card));
+  }
+}
+
+.notification-highlight {
+  animation: notification-highlight 0.75s ease-in-out 4;
+  border-radius: 0.75rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-subtle-in {
     animation: none;
+  }
+  .notification-highlight {
+    animation: none;
+    outline: 3px solid var(--warning);
   }
   html {
     scroll-behavior: auto;

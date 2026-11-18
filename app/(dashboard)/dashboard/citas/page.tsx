@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
+  AlertCircle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -22,7 +23,7 @@ import { AppointmentsTable } from "@/features/appointments/components/appointmen
 import {
   AppointmentCalendar,
   type CalendarAppointment,
-} from "@/features/appointments/components/calendar";
+} from "@/features/appointments/components/calendar-loader";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { FilterSelect } from "@/components/shared/filter-select";
@@ -31,7 +32,7 @@ import { Pagination } from "@/components/shared/pagination";
 import { STATUS_OPTIONS } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AppointmentStatus, MemberRole } from "@/types/database";
+import type { AppointmentStatus } from "@/types/database";
 
 export const metadata: Metadata = { title: "Citas" };
 
@@ -83,6 +84,8 @@ export default async function AppointmentsPage({
   const first = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value[0] : value;
 
+  const isEmployee = session.membership.role === "employee";
+  const canCreate = !isEmployee;
   const timezone = session.organization.timezone;
   const currency = session.organization.currency;
   const today = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
@@ -154,7 +157,7 @@ export default async function AppointmentsPage({
         timezone={timezone}
         currency={currency}
         emptyAction={
-          session.membership.role !== "employee"
+          canCreate
             ? { label: "Agendar cita", href: "/dashboard/citas/nueva" }
             : undefined
         }
@@ -193,14 +196,15 @@ export default async function AppointmentsPage({
     );
   }
 
-  const role = session.membership.role as MemberRole;
-  const canCreate = role !== "employee";
-
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Citas"
-        description="Consulta, filtra y gestiona la agenda de tu negocio."
+        title={isEmployee ? "Mis citas" : "Citas"}
+        description={
+          isEmployee
+            ? "Consulta las citas que tienes asignadas, su horario y estado."
+            : "Consulta, filtra y gestiona la agenda de tu negocio."
+        }
         actions={
           canCreate ? (
             <Button asChild size="sm">
@@ -211,6 +215,19 @@ export default async function AppointmentsPage({
           ) : null
         }
       />
+
+      {isEmployee && !session.membership.employee_id ? (
+        <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="font-medium">Tu cuenta aún no está vinculada al equipo</p>
+            <p className="mt-0.5 text-muted-foreground">
+              Pide a un propietario o administrador que te agregue desde Equipo →
+              Agregar personal. Mientras tanto no verás citas asignadas.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -224,15 +241,17 @@ export default async function AppointmentsPage({
               label: option.label,
             }))}
           />
-          <FilterSelect
-            param="employee"
-            placeholder="Profesional"
-            allLabel="Todo el equipo"
-            options={(employees ?? []).map((employee) => ({
-              value: employee.id,
-              label: employee.full_name,
-            }))}
-          />
+          {isEmployee ? null : (
+            <FilterSelect
+              param="employee"
+              placeholder="Profesional"
+              allLabel="Todo el equipo"
+              options={(employees ?? []).map((employee) => ({
+                value: employee.id,
+                label: employee.full_name,
+              }))}
+            />
+          )}
           <FilterSelect
             param="service"
             placeholder="Servicio"

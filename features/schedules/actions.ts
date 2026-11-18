@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { auditAction } from "@/lib/action-audit";
@@ -21,6 +21,7 @@ function revalidateSchedules() {
   revalidatePath("/dashboard/horarios");
   revalidatePath("/dashboard/citas");
   revalidatePath("/dashboard");
+  revalidateTag("public-organizations", "max");
 }
 
 function invalid(

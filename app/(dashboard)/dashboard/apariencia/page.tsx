@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shared/page-header";
 export const metadata: Metadata = { title: "Apariencia" };
 
 export default async function AppearancePage() {
-  const session = await requirePermission("settings:read");
+  const session = await requirePermission("appearance:write");
 
   return (
     <div className="space-y-6">

@@ -24,7 +24,7 @@ export function Logo({
       </span>
       {!compact ? (
         <span className="text-[17px]">
-          Agenda<span className="text-primary">Pro</span>
+          Agenda<span className="text-primary">TEX</span>
         </span>
       ) : null}
     </Link>

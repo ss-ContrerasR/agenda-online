@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Settings, UserRound, ShieldCheck } from "lucide-react";
+import { Bell, LogOut, Settings, UserRound, ShieldCheck } from "lucide-react";
 import { signOutAction } from "@/features/auth/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,11 @@ export function UserMenu({
         <DropdownMenuItem asChild>
           <Link href="/dashboard/configuracion">
             <Settings /> Configuración
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/dashboard/notificaciones">
+            <Bell /> Notificaciones
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

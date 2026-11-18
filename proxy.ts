@@ -41,7 +41,15 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Solo las rutas que necesitan sesión pasan por Supabase. Las páginas
+  // públicas (landing, directorio y reservas) responden sin una llamada de
+  // autenticación adicional en cada visita.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)",
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/onboarding",
+    "/login",
+    "/registro",
+    "/auth/:path*",
   ],
 };

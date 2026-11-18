@@ -13,6 +13,8 @@ import { ROLE_LABELS } from "@/lib/permissions";
 import { getNavigation } from "@/components/dashboard/navigation";
 import type { MemberRole } from "@/types/database";
 import { Logo } from "@/components/shared/logo";
+import { InfoHint } from "@/components/shared/info-hint";
+import { AppImage } from "@/components/shared/app-image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export type SidebarOrg = {
@@ -51,10 +53,12 @@ export function SidebarContent({
       <div className="px-3 pt-4">
         <div className="flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-2">
           {org.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <AppImage
               src={org.logoUrl}
               alt={org.name}
+              width={32}
+              height={32}
+              sizes="32px"
               className="size-8 rounded-md object-cover"
             />
           ) : (
@@ -89,29 +93,37 @@ export function SidebarContent({
                   const active = isActive(pathname, item.href, item.exact);
                   const Icon = item.icon;
                   return (
-                    <Link
+                    <div
                       key={item.href}
-                      href={item.href}
-                      onClick={onNavigate}
-                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                        "group flex items-center rounded-md pr-1.5 transition-colors",
                         active
                           ? "bg-primary/10 font-medium text-primary"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                       )}
                     >
-                      <Icon
-                        className={cn(
-                          "size-4 shrink-0",
-                          active ? "text-primary" : "text-sidebar-muted group-hover:text-sidebar-foreground",
-                        )}
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        aria-current={active ? "page" : undefined}
+                        className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-sm"
+                      >
+                        <Icon
+                          className={cn(
+                            "size-4 shrink-0",
+                            active ? "text-primary" : "text-sidebar-muted group-hover:text-sidebar-foreground",
+                          )}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                      <InfoHint
+                        content={item.info}
+                        label={`¿Qué hace ${item.label}?`}
                       />
-                      <span className="truncate">{item.label}</span>
                       {active ? (
-                        <ChevronRight className="ml-auto size-3.5 text-primary/70" />
+                        <ChevronRight className="size-3.5 shrink-0 text-primary/70" />
                       ) : null}
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

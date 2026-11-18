@@ -3,8 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { formatDateInTz, formatTimeInTz } from "@/lib/utils";
+import { publicEnv } from "@/lib/env";
 import { sendEmail } from "@/lib/notifications/email";
-import { appointmentEmailHtml } from "@/lib/notifications/templates";
+import { renderEmailHtml } from "@/lib/notifications/email-template";
+import { loadEmailTemplate } from "@/lib/email/load";
 import type { NotificationEvent } from "@/lib/notifications/templates";
 
 export type NotifyAppointmentInput = {
@@ -12,6 +14,7 @@ export type NotifyAppointmentInput = {
   organization: {
     id: string;
     name: string;
+    slug: string;
     email: string | null;
     timezone: string;
     currency: string;
@@ -25,6 +28,7 @@ export type NotifyAppointmentInput = {
   };
   serviceName: string;
   employeeName: string;
+  employeeUserId: string | null;
   client: {
     name: string;
     email: string | null;
@@ -115,6 +119,22 @@ export async function notifyAppointmentEvent(
     },
   ];
 
+  const inAppMetadata = {
+    event: input.event,
+    service: input.serviceName,
+    employee: input.employeeName,
+    employee_user_id: input.employeeUserId,
+    starts_at: input.appointment.starts_at,
+    public_token: input.appointment.public_token,
+    href: `/dashboard/citas/${input.appointment.id}?highlight=${input.appointment.id}`,
+    highlight: input.appointment.id,
+  };
+
+  const emailTemplate = await loadEmailTemplate(admin, input.organization, {
+    fallbackAccent: input.settings?.brand_primary,
+  });
+  const appointmentUrl = `${publicEnv.appUrl}/reservar/${input.organization.slug}/cita/${input.appointment.public_token}`;
+
   for (const recipient of recipients) {
     const baseRow = {
       organization_id: input.organization.id,
@@ -145,19 +165,31 @@ export async function notifyAppointmentEvent(
       continue;
     }
 
-    const html = appointmentEmailHtml({
+    const { html, text } = await renderEmailHtml({
+      config: emailTemplate,
       businessName: input.organization.name,
-      headline: recipient.title,
-      intro: recipient.intro,
-      rows,
-      accent: input.settings.brand_primary,
-      footer: `Gestiona tu cita en ${process.env.NEXT_PUBLIC_APP_URL ?? ""}`,
+      content: {
+        previewText: `${recipient.title} · ${input.organization.name}`,
+        heading: recipient.title,
+        intro: recipient.intro,
+        rows,
+        ctaUrl: appointmentUrl,
+        ctaLabel: emailTemplate.buttonLabel,
+        footer:
+          emailTemplate.footerText ??
+          `Gestiona tu cita en ${publicEnv.appUrl}`,
+      },
     });
 
     const result = await sendEmail({
       to: recipient.email,
       subject: `${recipient.title} · ${input.organization.name}`,
       html,
+      text,
+      sender: {
+        name: emailTemplate.senderName,
+        email: emailTemplate.senderEmail,
+      },
     });
 
     await admin.from("notifications").insert({
@@ -168,4 +200,23 @@ export async function notifyAppointmentEvent(
       sent_at: result.status === "sent" ? new Date().toISOString() : null,
     });
   }
+
+  // Aviso interno para el panel. Se guarda aparte del correo para que la
+  // bandeja pueda mostrarlo, resaltar la cita y avisar en tiempo real sin
+  // depender de que el correo esté configurado.
+  await admin.from("notifications").insert({
+    organization_id: input.organization.id,
+    user_id: null,
+    appointment_id: input.appointment.id,
+    type: `appointment_${input.event}`,
+    channel: "in_app",
+    recipient: null,
+    title: copy.title,
+    body: rows
+      .map((row) => `${row.label}: ${row.value}`)
+      .join(" · "),
+    status: "sent",
+    metadata: inAppMetadata,
+    sent_at: new Date().toISOString(),
+  });
 }

@@ -16,6 +16,15 @@ const MEMBERSHIP_VALUES = [
   "cancelled",
 ] as const;
 
+const LICENSE_PLAN_VALUES = [
+  "trial",
+  "monthly",
+  "bimonthly",
+  "semiannual",
+  "annual",
+  "custom",
+] as const;
+
 const CURRENCY_VALUES = [
   "COP",
   "USD",
@@ -106,6 +115,28 @@ export const updateOrganizationBillingSchema = z.object({
     .or(z.literal("")),
 });
 
+const licenseDate = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
+
+export const saveOrganizationLicenseSchema = z
+  .object({
+    organizationId: z.uuid("Empresa inválida"),
+    plan: z.enum(LICENSE_PLAN_VALUES),
+    startsAt: licenseDate,
+    expiresAt: licenseDate,
+  })
+  .refine(
+    (value) =>
+      new Date(`${value.expiresAt}T23:59:59.999Z`).getTime() >
+      new Date(`${value.startsAt}T00:00:00.000Z`).getTime(),
+    {
+      message: "El vencimiento debe ser posterior al inicio.",
+      path: ["expiresAt"],
+    },
+  );
+
 export type CreateOrganizationInput = z.input<typeof createOrganizationSchema>;
 export type SuspendUserInput = z.input<typeof suspendUserSchema>;
 export type ReactivateUserInput = z.input<typeof reactivateUserSchema>;
@@ -114,4 +145,7 @@ export type SuspendOrganizationInput = z.input<typeof suspendOrganizationSchema>
 export type ReactivateOrganizationInput = z.input<typeof reactivateOrganizationSchema>;
 export type UpdateOrganizationBillingInput = z.input<
   typeof updateOrganizationBillingSchema
+>;
+export type SaveOrganizationLicenseInput = z.infer<
+  typeof saveOrganizationLicenseSchema
 >;

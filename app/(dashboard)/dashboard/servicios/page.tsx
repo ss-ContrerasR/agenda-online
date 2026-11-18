@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Clock3, Pencil, Sparkles, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Clock3, FolderTree, Pencil, Sparkles, UserRound } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCatalog } from "@/features/services/queries";
@@ -41,6 +42,8 @@ export default async function ServicesPage() {
     linksByService.set(link.service_id, list);
   }
 
+  const categoryIds = new Set(catalog.categories.map((category) => category.id));
+
   const groups = [
     ...catalog.categories.map((category) => ({
       id: category.id,
@@ -58,7 +61,10 @@ export default async function ServicesPage() {
       color: "#94A3B8",
       description: null,
       category: null,
-      services: catalog.services.filter((service) => !service.category_id),
+      services: catalog.services.filter(
+        (service) =>
+          !service.category_id || !categoryIds.has(service.category_id),
+      ),
     },
   ].filter((group) => group.services.length > 0 || group.category);
 
@@ -144,15 +150,22 @@ export default async function ServicesPage() {
         title="Servicios"
         description={`${catalog.services.length} servicios · ${totalActive} activos en la reserva pública`}
         actions={
-          canWrite ? (
-            <>
-              <CategoryFormDialog />
-              <ServiceFormDialog
-                categories={catalog.categories}
-                employees={catalog.employees}
-              />
-            </>
-          ) : null
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/categorias">
+                <FolderTree className="size-4" /> Categorías
+              </Link>
+            </Button>
+            {canWrite ? (
+              <>
+                <CategoryFormDialog />
+                <ServiceFormDialog
+                  categories={catalog.categories}
+                  employees={catalog.employees}
+                />
+              </>
+            ) : null}
+          </>
         }
       />
 

@@ -9,9 +9,15 @@ import {
   type ActionResult,
 } from "@/lib/errors";
 import { DEFAULT_SETTINGS } from "@/lib/auth";
+import {
+  isMissingLicenseColumns,
+  legacyTrialLicenseFields,
+  trialLicenseFields,
+} from "@/lib/license";
 import { slugify } from "@/lib/utils";
 import type {
   BillingStatus,
+  LicensePlan,
   MembershipStatus,
   ProfileRow,
 } from "@/types/database";
@@ -19,6 +25,7 @@ import {
   createOrganizationSchema,
   reactivateOrganizationSchema,
   reactivateUserSchema,
+  saveOrganizationLicenseSchema,
   setMembershipStatusSchema,
   suspendOrganizationSchema,
   suspendUserSchema,
@@ -26,6 +33,7 @@ import {
   type CreateOrganizationInput,
   type ReactivateOrganizationInput,
   type ReactivateUserInput,
+  type SaveOrganizationLicenseInput,
   type SetMembershipStatusInput,
   type SuspendOrganizationInput,
   type SuspendUserInput,
@@ -47,6 +55,7 @@ function validationResult(error: {
 function revalidatePlatform(paths: string[]) {
   revalidatePath("/admin");
   revalidatePath("/admin/empresas");
+  revalidatePath("/admin/licencias");
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/auditoria");
   revalidatePath("/dashboard");
@@ -77,6 +86,48 @@ function dateInputToIso(value: string | undefined): string | null {
   if (!value) return null;
   const date = new Date(`${value}T23:59:59.999Z`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function dateInputStartIso(value: string): string {
+  return new Date(`${value}T00:00:00.000Z`).toISOString();
+}
+
+/**
+ * Si la migración de licencias todavía no se aplicó, seguimos guardando el
+ * vencimiento en `current_period_end` para no romper la operación actual.
+ */
+async function updateLicenseFields(
+  organizationId: string,
+  values: {
+    startsAt: string;
+    expiresAt: string;
+    plan: LicensePlan;
+    billingStatus: "active" | "trialing" | "suspended";
+  },
+) {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      license_start_at: values.startsAt,
+      license_expires_at: values.expiresAt,
+      license_plan: values.plan,
+      billing_status: values.billingStatus,
+      current_period_end: values.expiresAt,
+    })
+    .eq("id", organizationId);
+
+  if (!error) return;
+  if (!isMissingLicenseColumns(error)) throw error;
+
+  const { error: legacyError } = await admin
+    .from("organizations")
+    .update({
+      billing_status: values.billingStatus,
+      current_period_end: values.expiresAt,
+    })
+    .eq("id", organizationId);
+  if (legacyError) throw legacyError;
 }
 
 type SetUserSuspensionArgs = {
@@ -225,20 +276,32 @@ export async function createOrganizationAction(
       createdAuthUserId = created.user.id;
     }
 
-    const { data: organization, error: orgError } = await admin
+    const now = new Date();
+    const organizationValues = {
+      name: values.name,
+      slug,
+      email: values.email || null,
+      phone: values.phone || null,
+      city: values.city || null,
+      timezone: values.timezone,
+      currency: values.currency,
+    };
+
+    let orgResult = await admin
       .from("organizations")
-      .insert({
-        name: values.name,
-        slug,
-        email: values.email || null,
-        phone: values.phone || null,
-        city: values.city || null,
-        timezone: values.timezone,
-        currency: values.currency,
-        billing_status: "trialing",
-      })
+      .insert({ ...organizationValues, ...trialLicenseFields(now) })
       .select("*")
       .single();
+
+    if (orgResult.error && isMissingLicenseColumns(orgResult.error)) {
+      orgResult = await admin
+        .from("organizations")
+        .insert({ ...organizationValues, ...legacyTrialLicenseFields(now) })
+        .select("*")
+        .single();
+    }
+
+    const { data: organization, error: orgError } = orgResult;
     if (orgError || !organization) {
       throw orgError ?? new Error("No se pudo crear la empresa.");
     }
@@ -433,6 +496,66 @@ export async function updateOrganizationBillingAction(
 
     revalidatePlatform([`/admin/empresas/${parsed.data.organizationId}`]);
     return { ok: true, message: "Datos de facturación actualizados." };
+  } catch (error) {
+    return { ok: false, error: getActionError(error) };
+  }
+}
+
+export async function saveOrganizationLicenseAction(
+  input: SaveOrganizationLicenseInput,
+): Promise<AdminActionResult> {
+  const { user } = await requirePlatformAdminContext();
+  const parsed = saveOrganizationLicenseSchema.safeParse(input);
+  if (!parsed.success) return validationResult(parsed.error);
+
+  const values = parsed.data;
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data: organization } = await admin
+      .from("organizations")
+      .select("slug, is_active, billing_status")
+      .eq("id", values.organizationId)
+      .maybeSingle();
+    if (!organization) return { ok: false, error: "La empresa no existe." };
+
+    const keepSuspended =
+      !organization.is_active ||
+      organization.billing_status === "suspended" ||
+      organization.billing_status === "cancelled";
+    const billingStatus = keepSuspended
+      ? "suspended"
+      : values.plan === "trial"
+        ? "trialing"
+        : "active";
+
+    await updateLicenseFields(values.organizationId, {
+      startsAt: dateInputStartIso(values.startsAt),
+      expiresAt: dateInputToIso(values.expiresAt)!,
+      plan: values.plan,
+      billingStatus,
+    });
+
+    await recordAdminAudit({
+      organizationId: values.organizationId,
+      userId: user.id,
+      action: "superadmin.license.updated",
+      entity: "organizations",
+      entityId: values.organizationId,
+      metadata: {
+        plan: values.plan,
+        startsAt: values.startsAt,
+        expiresAt: values.expiresAt,
+      },
+    });
+
+    revalidatePlatform([
+      `/admin/empresas/${values.organizationId}`,
+      `/reservar/${organization.slug}`,
+    ]);
+    return {
+      ok: true,
+      message: "Licencia actualizada. El cliente ya ve la nueva fecha de pago.",
+    };
   } catch (error) {
     return { ok: false, error: getActionError(error) };
   }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -8,6 +7,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppImage } from "@/components/shared/app-image";
 import { ManageAppointment } from "@/features/public-booking/manage-appointment";
 import { getAppointmentByToken } from "@/features/public-booking/queries";
 import { themeCss } from "@/lib/theme";
@@ -71,7 +71,7 @@ async function ManageContent({
               >
                 <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
                   {organization.logo_url ? (
-                    <Image
+                    <AppImage
                       src={organization.logo_url}
                       alt={organization.name}
                       fill
@@ -128,7 +128,7 @@ async function ManageContent({
                 © {new Date().getFullYear()} {organization.name}. Reservas
                 gestionadas con{" "}
                 <Link href="/" className="font-medium text-primary hover:underline">
-                  AgendaPro
+                  AgendaTEX
                 </Link>
                 .
               </p>

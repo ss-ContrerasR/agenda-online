@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ShieldCheck, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { ShieldCheck, UserRoundPlus, UsersRound } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { can, ROLE_LABELS } from "@/lib/permissions";
@@ -41,16 +42,22 @@ export default async function UsersPage() {
   const ownerCount = members.filter(
     (member) => member.is_active && member.role === "owner",
   ).length;
+  const employeeMembers = members.filter(
+    (member) => member.is_active && member.role === "employee",
+  );
+  const pendingTeamCount = employeeMembers.filter(
+    (member) => !member.employee_id,
+  ).length;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Usuarios y permisos"
-        description="Administra quién tiene acceso al panel y qué puede hacer cada integrante."
+        description="Crea cuentas con contraseña temporal, define su rol y, si atienden citas, agrégalas al equipo como personal."
         actions={canManage ? <AddMemberDialog /> : null}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Miembros" value={members.length} icon={UsersRound} />
         <StatCard label="Activos" value={activeCount} icon={ShieldCheck} />
         <StatCard
@@ -58,7 +65,28 @@ export default async function UsersPage() {
           value={ownerCount}
           hint="Debe conservarse al menos uno"
         />
+        <StatCard
+          label="Personal por agregar"
+          value={pendingTeamCount}
+          icon={UserRoundPlus}
+          hint="Empleados sin ficha en Equipo"
+        />
       </div>
+
+      {pendingTeamCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <UserRoundPlus className="size-4" />
+          {pendingTeamCount === 1
+            ? "Hay 1 cuenta con rol Empleado sin ficha en Equipo."
+            : `Hay ${pendingTeamCount} cuentas con rol Empleado sin ficha en Equipo.`}
+          <Link
+            href="/dashboard/empleados"
+            className="font-medium text-primary hover:underline"
+          >
+            Agregar personal
+          </Link>
+        </div>
+      ) : null}
 
       {members.length === 0 ? (
         <EmptyState
@@ -104,6 +132,16 @@ export default async function UsersPage() {
                             <p className="truncate text-xs text-muted-foreground">
                               {member.profile?.email ?? "Sin correo"}
                             </p>
+                            {member.role === "employee" ? (
+                              <Badge
+                                variant={member.employee_id ? "success" : "warning"}
+                                className="mt-1 font-normal"
+                              >
+                                {member.employee_id
+                                  ? "En equipo"
+                                  : "Falta agregarlo al equipo"}
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
                       </TableCell>

@@ -52,34 +52,58 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_NOT_CONFIRMED: "Debes confirmar tu correo antes de ingresar.",
 };
 
+/**
+ * Supabase/PostgREST devuelve errores como objetos planos con `message`, no como
+ * instancias de Error. Sin este normalization todos se convertían en el texto
+ * genérico "Ocurrió un error inesperado" y era imposible diagnosticarlos.
+ */
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "";
+}
+
 export function getActionError(error: unknown): string {
   if (error instanceof AppError) {
     return ERROR_MESSAGES[error.code] ?? error.message;
   }
-  if (error instanceof Error) {
-    const raw = error.message;
-    const known = Object.keys(ERROR_MESSAGES).find((code) =>
-      raw.includes(code),
-    );
-    if (known) return ERROR_MESSAGES[known];
-    if (
-      raw.includes("exclusion constraint") ||
-      raw.includes("appointments_no_overlap")
-    ) {
-      return ERROR_MESSAGES.SLOT_CONFLICT;
+
+  const raw = errorMessage(error);
+  if (!raw) return "Ocurrió un error inesperado. Inténtalo de nuevo.";
+
+  if (/duplicate key|unique constraint/i.test(raw)) {
+    if (/profiles/i.test(raw)) {
+      return "Ya existe un perfil con ese correo o identificador. Usa 'Usuario existente' para vincularlo.";
     }
-    if (raw.includes("duplicate key") && raw.includes("clients")) {
-      return ERROR_MESSAGES.DUPLICATE_EMAIL;
+    if (/organization_members/i.test(raw)) {
+      return "Ese usuario ya pertenece al equipo de esta organización.";
     }
-    if (raw.includes("duplicate key") && raw.includes("slug")) {
-      return ERROR_MESSAGES.DUPLICATE_SLUG;
+    if (/employees/i.test(raw)) {
+      return "Ya existe una ficha de empleado para ese usuario.";
     }
-    if (raw.includes("AuthApiError")) {
-      return "No fue posible completar la operación de autenticación.";
-    }
-    return raw;
+    if (/clients/i.test(raw)) return ERROR_MESSAGES.DUPLICATE_EMAIL;
+    if (/slug/i.test(raw)) return ERROR_MESSAGES.DUPLICATE_SLUG;
   }
-  return "Ocurrió un error inesperado. Inténtalo de nuevo.";
+
+  const known = Object.keys(ERROR_MESSAGES).find((code) => raw.includes(code));
+  if (known) return ERROR_MESSAGES[known];
+  if (
+    raw.includes("exclusion constraint") ||
+    raw.includes("appointments_no_overlap")
+  ) {
+    return ERROR_MESSAGES.SLOT_CONFLICT;
+  }
+  if (raw.includes("AuthApiError")) {
+    return "No fue posible completar la operación de autenticación.";
+  }
+  return raw;
 }
 
 export function fieldErrorsFromZod(

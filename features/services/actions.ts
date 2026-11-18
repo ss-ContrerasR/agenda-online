@@ -18,6 +18,7 @@ import {
 
 function revalidateCatalog() {
   revalidatePath("/dashboard/servicios");
+  revalidatePath("/dashboard/categorias");
   revalidatePath("/dashboard/empleados");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/citas");
@@ -241,6 +242,13 @@ export async function deleteCategoryAction(categoryId: string): Promise<ActionRe
   try {
     const session = await requirePermission("services:write");
     const supabase = await createSupabaseServerClient();
+    const { error: unlinkError } = await supabase
+      .from("services")
+      .update({ category_id: null })
+      .eq("category_id", categoryId)
+      .eq("organization_id", session.membership.organization_id);
+    if (unlinkError) throw unlinkError;
+
     const { error } = await supabase
       .from("service_categories")
       .update({ deleted_at: new Date().toISOString() })

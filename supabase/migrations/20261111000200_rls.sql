@@ -1,5 +1,5 @@
 -- =============================================================================
--- AgendaPro — Row Level Security (aislamiento multiempresa)
+-- AgendaTEX — Row Level Security (aislamiento multiempresa)
 -- =============================================================================
 
 set search_path = public, extensions;

@@ -17,6 +17,9 @@ export type Permission =
   | "settings:read"
   | "settings:write"
   | "appearance:write"
+  | "email:read"
+  | "email:write"
+  | "email:send"
   | "users:manage"
   | "notifications:read";
 
@@ -36,6 +39,9 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     "settings:read",
     "settings:write",
     "appearance:write",
+    "email:read",
+    "email:write",
+    "email:send",
     "users:manage",
     "notifications:read",
   ],
@@ -54,6 +60,9 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     "settings:read",
     "settings:write",
     "appearance:write",
+    "email:read",
+    "email:write",
+    "email:send",
     "users:manage",
     "notifications:read",
   ],
@@ -63,19 +72,22 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     "clients:read",
     "clients:write",
     "services:read",
+    "services:write",
     "employees:read",
-    "schedules:read",
-    "settings:read",
+    "employees:write",
     "reports:read",
+    "settings:read",
+    "settings:write",
+    "email:read",
+    "email:write",
+    "email:send",
+    "notifications:read",
   ],
   employee: [
     "appointments:read",
     "appointments:write:own",
     "clients:read:assigned",
-    "services:read",
-    "employees:read",
-    "schedules:read",
-    "settings:read",
+    "notifications:read",
   ],
 };
 

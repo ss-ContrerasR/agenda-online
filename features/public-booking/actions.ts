@@ -263,6 +263,7 @@ async function safeNotify(input: {
       organization: {
         id: input.details.organization.id,
         name: input.details.organization.name,
+        slug: input.details.organization.slug,
         email: input.details.organization.email,
         timezone: input.details.organization.timezone,
         currency: input.details.organization.currency,
@@ -271,6 +272,7 @@ async function safeNotify(input: {
       appointment: input.appointment,
       serviceName: input.details.service.name,
       employeeName: input.details.employee.full_name,
+      employeeUserId: input.details.employee.user_id,
       client: {
         name: input.details.client.full_name,
         email: input.details.client.email,

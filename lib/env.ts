@@ -1,4 +1,4 @@
-export const APP_NAME = "AgendaPro";
+export const APP_NAME = "AgendaTEX";
 export const DEMO_ORG_SLUG = "estudio-aurora";
 
 export const publicEnv = {

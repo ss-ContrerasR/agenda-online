@@ -11,13 +11,23 @@ import {
   BillingBadge,
 } from "@/features/superadmin/components/platform-badges";
 import {
-  OrganizationActions,
   OrganizationSuspensionNote,
 } from "@/features/superadmin/components/organization-actions";
+import { LicenseRowActions } from "@/features/superadmin/components/license-actions";
 import { getAccessState, formatPlatformDate } from "@/features/superadmin/constants";
 import { AdminSkeleton } from "@/features/superadmin/components/admin-skeleton";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import {
+  daysUntil,
+  getLicenseExpiresAt,
+  getLicensePlan,
+  getLicenseStartsAt,
+  getLicenseState,
+  LICENSE_PLAN_LABELS,
+  licenseStateLabel,
+} from "@/lib/license";
+import { getCurrentTimestamp } from "@/lib/now";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
@@ -42,6 +52,9 @@ async function OrganizationDetailContent({ params }: Props) {
   if (!detail) notFound();
 
   const { organization, members, stats, history } = detail;
+  const now = await getCurrentTimestamp();
+  const expiresAt = getLicenseExpiresAt(organization);
+  const licenseState = getLicenseState(organization, now);
 
   return (
     <div className="space-y-6">
@@ -57,7 +70,7 @@ async function OrganizationDetailContent({ params }: Props) {
               Sitio público
             </Link>
           </Button>
-          <OrganizationActions organization={organization} />
+          <LicenseRowActions organization={organization} />
         </div>
       </div>
 
@@ -106,8 +119,21 @@ async function OrganizationDetailContent({ params }: Props) {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Fin del periodo</dt>
-              <dd>{formatPlatformDate(organization.current_period_end)}</dd>
+              <dt className="text-muted-foreground">Plan de licencia</dt>
+              <dd>{LICENSE_PLAN_LABELS[getLicensePlan(organization)]}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Inicio de licencia</dt>
+              <dd>{formatPlatformDate(getLicenseStartsAt(organization))}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Vencimiento de licencia</dt>
+              <dd>
+                <span className="font-medium">{formatPlatformDate(expiresAt)}</span>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {licenseStateLabel(licenseState, daysUntil(expiresAt, now))}
+                </span>
+              </dd>
             </div>
           </dl>
         </section>

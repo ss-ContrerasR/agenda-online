@@ -7,18 +7,47 @@ import {
   Building2,
   ChevronRight,
   LayoutDashboard,
+  ReceiptText,
   ScrollText,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
+import { InfoHint } from "@/components/shared/info-hint";
 import { cn, initials } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Resumen", icon: LayoutDashboard, exact: true },
-  { href: "/admin/empresas", label: "Empresas", icon: Building2 },
-  { href: "/admin/usuarios", label: "Usuarios y accesos", icon: Users },
-  { href: "/admin/auditoria", label: "Auditoría", icon: ScrollText },
+  {
+    href: "/admin",
+    label: "Resumen",
+    icon: LayoutDashboard,
+    info: "Métricas globales y accesos rápidos de la plataforma.",
+    exact: true,
+  },
+  {
+    href: "/admin/empresas",
+    label: "Empresas",
+    icon: Building2,
+    info: "Todos los negocios clientes y su disponibilidad.",
+  },
+  {
+    href: "/admin/licencias",
+    label: "Licencias",
+    icon: ReceiptText,
+    info: "Fechas de pago, planes y suspensión de clientes.",
+  },
+  {
+    href: "/admin/usuarios",
+    label: "Usuarios y accesos",
+    icon: Users,
+    info: "Cuentas de la plataforma y suspensiones individuales.",
+  },
+  {
+    href: "/admin/auditoria",
+    label: "Auditoría",
+    icon: ScrollText,
+    info: "Historial de cambios sensibles.",
+  },
 ];
 
 export function AdminNav({
@@ -55,21 +84,26 @@ export function AdminNav({
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link
+            <div
               key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
               className={cn(
-                "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                "group flex items-center rounded-md pr-1.5 transition-colors",
                 active
                   ? "bg-primary/10 font-medium text-primary"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               )}
             >
-              <Icon className="size-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
-              {active ? <ChevronRight className="ml-auto size-3.5 text-primary/70" /> : null}
-            </Link>
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-sm"
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+              <InfoHint content={item.info} label={`¿Qué hace ${item.label}?`} />
+              {active ? <ChevronRight className="size-3.5 text-primary/70" /> : null}
+            </div>
           );
         })}
       </nav>

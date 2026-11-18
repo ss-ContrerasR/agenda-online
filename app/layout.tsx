@@ -7,11 +7,16 @@ import { APP_NAME } from "@/lib/env";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  // La mono solo se usa en códigos y atajos pequeños; no conviene precargarla
+  // en todas las páginas.
+  preload: false,
 });
 
 export const metadata: Metadata = {

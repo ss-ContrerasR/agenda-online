@@ -61,7 +61,7 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
           <div className="w-full max-w-md">{children}</div>
         </div>
         <footer className="px-5 py-5 text-center text-xs text-muted-foreground sm:px-8">
-          © {year} AgendaPro. Todos los derechos reservados.
+          © {year} AgendaTEX. Todos los derechos reservados.
         </footer>
       </main>
     </div>

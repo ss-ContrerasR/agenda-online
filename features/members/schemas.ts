@@ -32,8 +32,31 @@ export const addMemberSchema = z.object({
   role: assignableRoleSchema,
 });
 
+export const createUserSchema = z.object({
+  fullName: z.string().trim().min(2, "Ingresa el nombre completo").max(120),
+  email: z.email("Ingresa un correo válido").transform((value) =>
+    value.trim().toLowerCase(),
+  ),
+  password: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .min(8, "La contraseña temporal debe tener al menos 8 caracteres")
+        .max(72, "La contraseña es demasiado larga"),
+    ])
+    .optional(),
+  role: assignableRoleSchema,
+  phone: z.string().trim().max(30, "El teléfono es demasiado largo").optional(),
+});
+
 export function parseAddMemberForm(formData: FormData) {
   return formDataObject(formData);
 }
 
+export function parseCreateUserForm(formData: FormData) {
+  return formDataObject(formData);
+}
+
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;

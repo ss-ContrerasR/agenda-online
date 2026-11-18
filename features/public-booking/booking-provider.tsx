@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import { CalendarDays } from "lucide-react";
 import {
   Dialog,
@@ -17,7 +18,34 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { BookingWizard, type BookingConfig } from "@/features/public-booking/booking-wizard";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { BookingConfig } from "@/features/public-booking/booking-wizard";
+
+/**
+ * El asistente carga React Hook Form, Zod y date-fns. Se descarga solo al
+ * abrir el modal, de modo que la página pública pinta mucho antes.
+ */
+const BookingWizard = dynamic(
+  () =>
+    import("@/features/public-booking/booking-wizard").then(
+      (module) => module.BookingWizard,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4 p-6">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-2 w-full" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </div>
+    ),
+  },
+);
 
 type BookingContextValue = {
   openWizard: (serviceId?: string) => void;

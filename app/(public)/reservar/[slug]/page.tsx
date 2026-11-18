@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -29,6 +28,7 @@ import type {
 } from "@/features/public-booking/booking-wizard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AppImage } from "@/components/shared/app-image";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -203,7 +203,7 @@ async function PublicPageContent({
               >
                 <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
                   {organization.logo_url ? (
-                    <Image
+                    <AppImage
                       src={organization.logo_url}
                       alt={organization.name}
                       fill
@@ -256,7 +256,7 @@ async function PublicPageContent({
 
           <section className="relative isolate overflow-hidden bg-slate-950 text-white">
             {organization.cover_url || settings.public_hero_url ? (
-              <Image
+              <AppImage
                 src={
                   settings.public_hero_url ??
                   organization.cover_url ??
@@ -264,8 +264,9 @@ async function PublicPageContent({
                 }
                 alt={organization.name}
                 fill
-                priority
+                preload
                 sizes="100vw"
+                quality={75}
                 className="object-cover opacity-55"
               />
             ) : null}
@@ -429,7 +430,7 @@ async function PublicPageContent({
                           >
                             <div className="relative aspect-[16/9] overflow-hidden bg-muted">
                               {service.image_url ? (
-                                <Image
+                                <AppImage
                                   src={service.image_url}
                                   alt={service.name}
                                   fill
@@ -495,7 +496,7 @@ async function PublicPageContent({
                       <div className="flex items-center gap-3">
                         <span className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                           {employee.photo_url ? (
-                            <Image
+                            <AppImage
                               src={employee.photo_url}
                               alt={employee.full_name}
                               fill
@@ -668,7 +669,7 @@ async function PublicPageContent({
                 © {new Date().getFullYear()} {organization.name}. Reservas
                 gestionadas con{" "}
                 <Link href="/" className="font-medium text-primary hover:underline">
-                  AgendaPro
+                  AgendaTEX
                 </Link>
                 .
               </p>

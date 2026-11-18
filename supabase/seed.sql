@@ -1,10 +1,10 @@
 -- =============================================================================
--- AgendaPro — Datos de demostración
+-- AgendaTEX — Datos de demostración
 -- Usuarios demo (contraseña: Demo1234!)
 --   owner@estudioaurora.com      → propietaria
 --   recepcion@estudioaurora.com  → recepcionista
 --   valeria@estudioaurora.com    → empleada
---   admin@agendapro.co           → superadministrador de plataforma
+--   admin@agendatex.co           → superadministrador de plataforma
 --   owner@barberianorte.com      → propietario de Barbería Norte
 --   owner@tex.com                → propietario de Tex Studio (/reservar/tex)
 -- Todos usan la contraseña Demo1234!.
@@ -36,7 +36,7 @@ from (values
   ('b1000000-0000-4000-8000-000000000001'::uuid, 'owner@estudioaurora.com', 'Laura Mendoza'),
   ('b1000000-0000-4000-8000-000000000002'::uuid, 'recepcion@estudioaurora.com', 'Paula Gómez'),
   ('b1000000-0000-4000-8000-000000000003'::uuid, 'valeria@estudioaurora.com', 'Valeria Ríos'),
-  ('b1000000-0000-4000-8000-000000000009'::uuid, 'admin@agendapro.co', 'Admin AgendaPro'),
+  ('b1000000-0000-4000-8000-000000000009'::uuid, 'admin@agendatex.co', 'Admin AgendaTEX'),
   ('b1000000-0000-4000-8000-000000000005'::uuid, 'owner@barberianorte.com', 'Mateo Salazar'),
   ('b1000000-0000-4000-8000-000000000006'::uuid, 'owner@tex.com', 'CarolinaTEX')
 ) as u(id, email, full_name)
@@ -516,3 +516,61 @@ values
 insert into public.business_hours (organization_id, weekday, is_open, open_time, close_time)
 select 'a1000000-0000-4000-8000-000000000003', d, d between 1 and 5, '09:00', '18:00'
 from generate_series(0, 6) as d;
+
+-- -----------------------------------------------------------------------------
+-- Plantillas de correo demo (una por organizacion)
+-- -----------------------------------------------------------------------------
+insert into public.email_templates (
+  organization_id, layout, accent_color, background_color, text_color,
+  sender_name, sender_email, header_title, header_subtitle, footer_text,
+  button_label, show_logo, show_details, socials
+) values
+  (
+    'a1000000-0000-4000-8000-000000000001',
+    'classic',
+    '#0F766E',
+    '#F1F5F9',
+    '#0F172A',
+    'Estudio Aurora',
+    'owner@estudioaurora.com',
+    'Estudio Aurora',
+    'Belleza, calma y detalle en cada visita',
+    'Gracias por preferirnos. Te esperamos pronto.',
+    'Ver mi cita',
+    true,
+    true,
+    '[{"label":"Instagram","url":"https://instagram.com"},{"label":"WhatsApp","url":"https://wa.me/573001234567"}]'::jsonb
+  ),
+  (
+    'a1000000-0000-4000-8000-000000000002',
+    'compact',
+    '#C2410C',
+    '#F8FAFC',
+    '#0F172A',
+    'Barberia Norte',
+    'owner@barberianorte.com',
+    'Barberia Norte',
+    'Cortes clasicos y fades precisos',
+    'Te esperamos en tu proxima visita.',
+    'Reservar de nuevo',
+    true,
+    true,
+    '[{"label":"Instagram","url":"https://instagram.com"}]'::jsonb
+  ),
+  (
+    'a1000000-0000-4000-8000-000000000003',
+    'minimal',
+    '#7C3AED',
+    '#FFFFFF',
+    '#111827',
+    'Tex Studio',
+    'owner@tex.com',
+    'Tex Studio',
+    'Prendas a medida y ajustes con detalle',
+    'Gracias por confiar en Tex Studio.',
+    'Agendar asesoria',
+    false,
+    true,
+    '[]'::jsonb
+  )
+;

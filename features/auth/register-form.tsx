@@ -32,7 +32,8 @@ export function RegisterForm() {
       <div className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">Crea tu cuenta</h1>
         <p className="text-sm text-muted-foreground">
-          Configura tu negocio en menos de un minuto.
+          Configura tu negocio en menos de un minuto y disfruta 7 días de prueba
+          con todas las funciones.
         </p>
       </div>
 

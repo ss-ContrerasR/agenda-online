@@ -1,5 +1,5 @@
 -- =============================================================================
--- AgendaPro — Lógica transaccional de citas
+-- AgendaTEX — Lógica transaccional de citas
 -- La validación de disponibilidad "fina" se calcula en el servidor (TS), pero
 -- aquí se revalidan reglas duras y la restricción EXCLUDE evita solapamientos.
 -- =============================================================================

@@ -2,26 +2,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { SessionContext } from "@/lib/auth";
 import { DesktopSidebar, type SidebarOrg } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
-import type { NotificationItem } from "@/components/dashboard/notifications-menu";
+import { LicenseBanner } from "@/components/dashboard/license-banner";
+import type { NotificationItem } from "@/lib/notifications/view";
+import { fetchInAppNotifications } from "@/lib/notifications/queries";
+import { getCurrentTimestamp } from "@/lib/now";
 import { themeCss } from "@/lib/theme";
-
-async function getNotifications(session: SessionContext) {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("notifications")
-    .select("id, title, body, created_at, status")
-    .eq("organization_id", session.membership.organization_id)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  return (data ?? []).map<NotificationItem>((item) => ({
-    id: item.id,
-    title: item.title,
-    body: item.body,
-    createdAt: item.created_at,
-    status: item.status,
-  }));
-}
 
 export async function DashboardShell({
   session,
@@ -30,7 +15,17 @@ export async function DashboardShell({
   session: SessionContext;
   children: React.ReactNode;
 }) {
-  const notifications = await getNotifications(session);
+  const notificationsUserId =
+    session.membership.role === "employee" ? session.user.id : null;
+  const [notifications, now] = await Promise.all([
+    fetchInAppNotifications(
+      await createSupabaseServerClient(),
+      session.membership.organization_id,
+      20,
+      notificationsUserId,
+    ),
+    getCurrentTimestamp(),
+  ]);
   const displayName =
     session.profile?.full_name?.trim() ||
     session.user.email?.split("@")[0] ||
@@ -70,9 +65,12 @@ export async function DashboardShell({
             email: session.user.email ?? "",
             avatarUrl: session.profile?.avatar_url ?? null,
           }}
-          notifications={notifications}
+          notifications={notifications satisfies NotificationItem[]}
+          organizationId={session.membership.organization_id}
+          notificationsUserId={notificationsUserId}
         />
         <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <LicenseBanner organization={session.organization} now={now} />
           {children}
         </main>
       </div>

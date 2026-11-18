@@ -36,26 +36,35 @@ function isPubliclyActive(
 }
 
 function withDefaults(
-  organizationId: string,
+  organization: Pick<OrganizationRow, "id" | "created_at" | "updated_at">,
   row: Partial<OrganizationSettingsRow> | null,
 ): OrganizationSettingsRow {
   return {
-    organization_id: organizationId,
+    organization_id: organization.id,
     ...DEFAULT_SETTINGS,
     ...(row ?? {}),
-    created_at: row?.created_at ?? new Date().toISOString(),
-    updated_at: row?.updated_at ?? new Date().toISOString(),
+    created_at: row?.created_at ?? organization.created_at,
+    updated_at: row?.updated_at ?? organization.updated_at,
   };
 }
+
+type PublicBookingCatalog = Omit<PublicBookingData, "minDate" | "maxDate">;
 
 /**
  * Catálogo público de una organización (servicios, equipo, horarios).
  * Se usa el cliente service-role porque el visitante no tiene sesión; todas
  * las consultas están acotadas por organización y por registros activos.
+ *
+ * El catálogo cambia poco, así que se cachea por slug y se invalida con la
+ * etiqueta `public-organizations` desde las acciones del panel.
  */
-export async function getPublicBookingData(
+async function getPublicBookingCatalog(
   slug: string,
-): Promise<PublicBookingData | null> {
+): Promise<PublicBookingCatalog | null> {
+  "use cache";
+  cacheTag("public-organizations", `public-organization:${slug}`);
+  cacheLife("minutes");
+
   if (!isAdminClientConfigured()) return null;
   if (!PUBLIC_SLUG_PATTERN.test(slug)) return null;
 
@@ -116,21 +125,30 @@ export async function getPublicBookingData(
       .order("weekday", { ascending: true }),
   ]);
 
-  const settings = withDefaults(organization.id, settingsRow);
-  const now = new Date();
-
   return {
     organization,
-    settings,
+    settings: withDefaults(organization, settingsRow),
     categories: categories ?? [],
     services: services ?? [],
     employees: employees ?? [],
     employeeServices: employeeServices ?? [],
     businessHours: businessHours ?? [],
-    minDate: formatInTimeZone(now, organization.timezone, "yyyy-MM-dd"),
+  };
+}
+
+export async function getPublicBookingData(
+  slug: string,
+): Promise<PublicBookingData | null> {
+  const catalog = await getPublicBookingCatalog(slug);
+  if (!catalog) return null;
+
+  const now = new Date();
+  return {
+    ...catalog,
+    minDate: formatInTimeZone(now, catalog.organization.timezone, "yyyy-MM-dd"),
     maxDate: formatInTimeZone(
-      addDays(now, settings.max_advance_days),
-      organization.timezone,
+      addDays(now, catalog.settings.max_advance_days),
+      catalog.organization.timezone,
       "yyyy-MM-dd",
     ),
   };
@@ -207,7 +225,7 @@ export async function getAppointmentByToken(
   return {
     appointment,
     organization,
-    settings: withDefaults(organization.id, settingsRow),
+    settings: withDefaults(organization, settingsRow),
     service,
     employee,
     client,

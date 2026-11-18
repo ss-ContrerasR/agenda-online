@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
   { label: "Propietaria", email: "owner@estudioaurora.com" },
   { label: "Recepción", email: "recepcion@estudioaurora.com" },
   { label: "Empleada", email: "valeria@estudioaurora.com" },
-  { label: "Superadmin", email: "admin@agendapro.co" },
+  { label: "Superadmin", email: "admin@agendatex.co" },
 ];
 
 export function LoginForm() {

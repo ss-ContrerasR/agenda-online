@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { MemberRole } from "@/types/database";
 
 type SearchResult = {
   type: "appointment" | "client" | "service" | "employee";
@@ -41,10 +42,16 @@ const QUICK_LINKS = [
 ];
 
 export function CommandPalette({
+  role,
   trigger,
 }: {
+  role?: MemberRole;
   trigger?: React.ReactNode;
 }) {
+  const quickLinks =
+    role === "employee"
+      ? [{ label: "Mis citas", href: "/dashboard/citas", icon: CalendarDays }]
+      : QUICK_LINKS;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -155,7 +162,7 @@ export function CommandPalette({
                 <p className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Accesos rápidos
                 </p>
-                {QUICK_LINKS.map((link) => {
+                {quickLinks.map((link) => {
                   const Icon = link.icon;
                   return (
                     <button

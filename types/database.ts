@@ -29,6 +29,13 @@ export type BillingStatus =
   | "past_due"
   | "suspended"
   | "cancelled";
+export type LicensePlan =
+  | "trial"
+  | "monthly"
+  | "bimonthly"
+  | "semiannual"
+  | "annual"
+  | "custom";
 export type SuspensionAction = "suspended" | "reactivated";
 
 type Table<Row, Required extends keyof Row = never> = {
@@ -55,6 +62,9 @@ export type OrganizationRow = {
   is_active: boolean;
   billing_status: BillingStatus;
   current_period_end: string | null;
+  license_start_at: string | null;
+  license_expires_at: string | null;
+  license_plan: LicensePlan;
   suspended_at: string | null;
   suspended_reason: string | null;
   created_at: string;
@@ -88,6 +98,28 @@ export type OrganizationSettingsRow = {
   socials: Json;
   seo_title: string | null;
   seo_description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmailLayout = "classic" | "compact" | "minimal";
+
+export type EmailTemplateRow = {
+  organization_id: string;
+  layout: EmailLayout;
+  logo_url: string | null;
+  accent_color: string;
+  background_color: string;
+  text_color: string;
+  sender_name: string | null;
+  sender_email: string | null;
+  header_title: string | null;
+  header_subtitle: string | null;
+  footer_text: string | null;
+  button_label: string | null;
+  show_logo: boolean;
+  show_details: boolean;
+  socials: Json;
   created_at: string;
   updated_at: string;
 };
@@ -301,6 +333,8 @@ export type NotificationRow = {
   error: string | null;
   metadata: Json;
   sent_at: string | null;
+  read_at: string | null;
+  deleted_at: string | null;
   created_at: string;
 };
 
@@ -328,6 +362,7 @@ export type Database = {
         OrganizationSettingsRow,
         "organization_id"
       >;
+      email_templates: Table<EmailTemplateRow, "organization_id">;
       profiles: Table<ProfileRow, "id">;
       platform_admins: Table<PlatformAdminRow, "user_id">;
       user_suspension_history: Table<

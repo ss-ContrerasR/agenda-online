@@ -46,7 +46,7 @@ export default async function ConfigurationRequiredPage() {
           <Server className="size-3" /> Entorno sin configurar
         </Badge>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">
-          Falta conectar AgendaPro con Supabase
+          Falta conectar AgendaTEX con Supabase
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
           El panel y las páginas públicas necesitan credenciales de Supabase para
@@ -126,7 +126,7 @@ export default async function ConfigurationRequiredPage() {
       </main>
 
       <footer className="px-5 py-5 text-center text-xs text-muted-foreground sm:px-8">
-        © {year} AgendaPro. Consulta el README para la guía
+        © {year} AgendaTEX. Consulta el README para la guía
         de instalación completa.
       </footer>
     </div>

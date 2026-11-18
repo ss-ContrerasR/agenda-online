@@ -6,6 +6,7 @@ import { BILLING_STATUS_OPTIONS } from "@/features/superadmin/constants";
 import { CreateOrganizationDialog } from "@/features/superadmin/components/create-organization-dialog";
 import { OrganizationsTable } from "@/features/superadmin/components/organizations-table";
 import { AdminSkeleton } from "@/features/superadmin/components/admin-skeleton";
+import { getCurrentTimestamp } from "@/lib/now";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { FilterSelect } from "@/components/shared/filter-select";
@@ -31,12 +32,10 @@ async function CompaniesContent({ searchParams }: Props) {
   const billing = firstParam(params.billing) ?? "all";
   const active = firstParam(params.active) ?? "all";
 
-  const { items, total } = await listOrganizations({
-    page: pageParams,
-    search,
-    billing,
-    active,
-  });
+  const [{ items, total }, now] = await Promise.all([
+    listOrganizations({ page: pageParams, search, billing, active }),
+    getCurrentTimestamp(),
+  ]);
 
   return (
     <>
@@ -64,7 +63,7 @@ async function CompaniesContent({ searchParams }: Props) {
         </p>
       </div>
 
-      <OrganizationsTable items={items} />
+      <OrganizationsTable items={items} now={now} />
 
       <Pagination
         page={pageParams.page}

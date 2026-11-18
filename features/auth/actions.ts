@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
+import {
+  isMissingLicenseColumns,
+  legacyTrialLicenseFields,
+  trialLicenseFields,
+} from "@/lib/license";
 import { slugify } from "@/lib/utils";
 import {
   fieldErrorsFromZod,
@@ -150,19 +155,31 @@ export async function completeOnboardingAction(
       attempt += 1;
     }
 
-    const { data: organization, error: orgError } = await admin
+    const now = new Date();
+    const organizationValues = {
+      name: parsed.data.name,
+      slug,
+      phone: parsed.data.phone || null,
+      email: user.email ?? null,
+      timezone: parsed.data.timezone,
+      currency: parsed.data.currency,
+    };
+
+    let orgResult = await admin
       .from("organizations")
-      .insert({
-        name: parsed.data.name,
-        slug,
-        phone: parsed.data.phone || null,
-        email: user.email ?? null,
-        timezone: parsed.data.timezone,
-        currency: parsed.data.currency,
-      })
+      .insert({ ...organizationValues, ...trialLicenseFields(now) })
       .select("*")
       .single();
 
+    if (orgResult.error && isMissingLicenseColumns(orgResult.error)) {
+      orgResult = await admin
+        .from("organizations")
+        .insert({ ...organizationValues, ...legacyTrialLicenseFields(now) })
+        .select("*")
+        .single();
+    }
+
+    const { data: organization, error: orgError } = orgResult;
     if (orgError || !organization) {
       throw orgError ?? new Error("No se pudo crear la organización.");
     }
@@ -222,5 +239,6 @@ export async function completeOnboardingAction(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/admin/licencias");
   redirect("/dashboard");
 }

@@ -1,14 +1,9 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatInTimeZone } from "date-fns-tz";
-import type {
-  AppointmentStatus,
-  Database,
-  EmployeeRow,
-  ServiceRow,
-} from "@/types/database";
-import type { DatePeriod } from "@/lib/date-range";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import type { AppointmentStatus, Database } from "@/types/database";
+import { addDaysToDateString, type DatePeriod } from "@/lib/date-range";
 
 type MetricAppointment = {
   id: string;
@@ -99,7 +94,7 @@ export async function getDashboardData(
 ): Promise<DashboardData> {
   const today = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
 
-  const [current, previous, newClients, previousNewClients, clientCount] =
+  const [current, previous, newClients, previousNewClients] =
     await Promise.all([
       loadRange(supabase, organizationId, period.start, period.end),
       loadRange(
@@ -122,13 +117,7 @@ export async function getDashboardData(
         .is("deleted_at", null)
         .gte("created_at", period.previous.start)
         .lt("created_at", period.previous.end),
-      supabase
-        .from("clients")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null),
     ]);
-  void clientCount;
 
   const currentRevenue = current
     .filter((row) => isRevenueStatus(row.status))
@@ -168,24 +157,26 @@ export async function getDashboardData(
     serviceIds.length
       ? supabase
           .from("services")
-          .select("*")
+          .select("id, name")
           .eq("organization_id", organizationId)
           .in("id", serviceIds)
-      : Promise.resolve({ data: [] as ServiceRow[] }),
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
     employeeIds.length
       ? supabase
           .from("employees")
-          .select("*")
+          .select("id, full_name, color")
           .eq("organization_id", organizationId)
           .in("id", employeeIds)
-      : Promise.resolve({ data: [] as EmployeeRow[] }),
+      : Promise.resolve({
+          data: [] as Array<{ id: string; full_name: string; color: string }>,
+        }),
   ]);
 
   const serviceMap = new Map(
-    ((services.data ?? []) as ServiceRow[]).map((row) => [row.id, row]),
+    (services.data ?? []).map((row) => [row.id, row]),
   );
   const employeeMap = new Map(
-    ((employees.data ?? []) as EmployeeRow[]).map((row) => [row.id, row]),
+    (employees.data ?? []).map((row) => [row.id, row]),
   );
 
   const serviceStats = new Map<string, { count: number; revenue: number }>();
@@ -331,5 +322,159 @@ export async function getDashboardData(
       };
     }),
     todayCount,
+  };
+}
+
+type UpcomingAppointmentRow = {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  status: AppointmentStatus;
+  price: number | string;
+  client_id: string;
+  service_id: string;
+  employee_id: string;
+};
+
+async function decorateAppointments(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  rows: UpcomingAppointmentRow[],
+): Promise<DashboardData["upcoming"]> {
+  const clientIds = Array.from(new Set(rows.map((row) => row.client_id)));
+  const serviceIds = Array.from(new Set(rows.map((row) => row.service_id)));
+  const employeeIds = Array.from(new Set(rows.map((row) => row.employee_id)));
+
+  const [clients, services, employees] = await Promise.all([
+    clientIds.length
+      ? supabase
+          .from("clients")
+          .select("id, full_name")
+          .eq("organization_id", organizationId)
+          .in("id", clientIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }> }),
+    serviceIds.length
+      ? supabase
+          .from("services")
+          .select("id, name")
+          .eq("organization_id", organizationId)
+          .in("id", serviceIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    employeeIds.length
+      ? supabase
+          .from("employees")
+          .select("id, full_name, color")
+          .eq("organization_id", organizationId)
+          .in("id", employeeIds)
+      : Promise.resolve({
+          data: [] as Array<{ id: string; full_name: string; color: string }>,
+        }),
+  ]);
+
+  const clientMap = new Map(
+    (clients.data ?? []).map((row) => [row.id, row.full_name]),
+  );
+  const serviceMap = new Map(
+    (services.data ?? []).map((row) => [row.id, row.name]),
+  );
+  const employeeMap = new Map(
+    (employees.data ?? []).map((row) => [row.id, row]),
+  );
+
+  return rows.map((row) => {
+    const employee = employeeMap.get(row.employee_id);
+    return {
+      id: row.id,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      status: row.status,
+      price: Number(row.price),
+      clientName: clientMap.get(row.client_id) ?? "Cliente",
+      serviceName: serviceMap.get(row.service_id) ?? "Servicio",
+      employeeName: employee?.full_name ?? "Profesional",
+      employeeColor: employee?.color ?? "#0F766E",
+    };
+  });
+}
+
+export type EmployeeDashboardData = {
+  /** false cuando la cuenta aún no está vinculada a una ficha del equipo. */
+  linked: boolean;
+  todayCount: number;
+  pendingToday: number;
+  completedToday: number;
+  upcoming: DashboardData["upcoming"];
+};
+
+/**
+ * Resumen acotado al profesional: solo sus citas. RLS ya filtra por
+ * `employee_id`, pero se envía el filtro explícito para que el resultado no
+ * dependa de que la política esté aplicada en el entorno.
+ */
+export async function getEmployeeDashboardData(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  timezone: string,
+  employeeId: string | null,
+): Promise<EmployeeDashboardData> {
+  if (!employeeId) {
+    return {
+      linked: false,
+      todayCount: 0,
+      pendingToday: 0,
+      completedToday: 0,
+      upcoming: [],
+    };
+  }
+
+  const today = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
+  const start = fromZonedTime(`${today}T00:00:00`, timezone).toISOString();
+  const end = fromZonedTime(
+    `${addDaysToDateString(today, 1)}T00:00:00`,
+    timezone,
+  ).toISOString();
+
+  const columns =
+    "id, starts_at, ends_at, status, price, client_id, service_id, employee_id";
+
+  const [todayResult, upcomingResult] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select(columns)
+      .eq("organization_id", organizationId)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .gte("starts_at", start)
+      .lt("starts_at", end)
+      .order("starts_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("appointments")
+      .select(columns)
+      .eq("organization_id", organizationId)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .gte("starts_at", new Date().toISOString())
+      .in("status", ["pending", "confirmed"])
+      .order("starts_at", { ascending: true })
+      .limit(8),
+  ]);
+
+  if (todayResult.error) throw todayResult.error;
+  if (upcomingResult.error) throw upcomingResult.error;
+
+  const todayRows = todayResult.data ?? [];
+  const upcoming = await decorateAppointments(
+    supabase,
+    organizationId,
+    upcomingResult.data ?? [],
+  );
+
+  return {
+    linked: true,
+    todayCount: todayRows.length,
+    pendingToday: todayRows.filter((row) => row.status === "pending").length,
+    completedToday: todayRows.filter((row) => row.status === "completed").length,
+    upcoming,
   };
 }

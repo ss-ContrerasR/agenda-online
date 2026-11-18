@@ -11,9 +11,9 @@ import { listPublicOrganizations } from "@/features/public-booking/queries";
 import { getCurrentYear } from "@/lib/year";
 
 export const metadata: Metadata = {
-  title: "Explorar negocios | AgendaPro",
+  title: "Explorar negocios | AgendaTEX",
   description:
-    "Descubre negocios activos en AgendaPro y reserva tu próxima cita en línea.",
+    "Descubre negocios activos en AgendaTEX y reserva tu próxima cita en línea.",
 };
 
 export default async function BusinessesPage() {
@@ -31,7 +31,7 @@ export default async function BusinessesPage() {
               <CalendarCheck2 className="size-4.5" />
             </span>
             <span>
-              <span className="block text-sm font-semibold">AgendaPro</span>
+              <span className="block text-sm font-semibold">AgendaTEX</span>
               <span className="block text-[11px] text-muted-foreground">
                 Directorio de negocios
               </span>
@@ -56,7 +56,7 @@ export default async function BusinessesPage() {
             Encuentra un negocio y reserva tu próxima cita
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Explora los negocios activos en AgendaPro, compara sus servicios y
+            Explora los negocios activos en AgendaTEX, compara sus servicios y
             elige el horario que mejor te funcione.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
@@ -87,7 +87,7 @@ export default async function BusinessesPage() {
 
       <footer className="border-t border-border bg-card">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:px-6">
-          <p>© {year} AgendaPro. Reservas gestionadas en línea.</p>
+          <p>© {year} AgendaTEX. Reservas gestionadas en línea.</p>
           <div className="flex items-center gap-4">
             <Link href="/negocios" className="hover:text-foreground">
               Explorar negocios

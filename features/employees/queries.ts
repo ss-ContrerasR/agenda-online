@@ -14,6 +14,55 @@ export type EmployeesData = {
   links: EmployeeServiceRow[];
 };
 
+export type EmployeeCandidate = {
+  membershipId: string;
+  userId: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+};
+
+/**
+ * Cuentas con rol Empleado que todavía no tienen ficha en Equipo. Son los
+ * profesionales que se pueden agregar como personal desde esta sección.
+ */
+export async function getEmployeeCandidates(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+): Promise<EmployeeCandidate[]> {
+  const { data: members, error } = await supabase
+    .from("organization_members")
+    .select("id, user_id")
+    .eq("organization_id", organizationId)
+    .eq("role", "employee")
+    .eq("is_active", true)
+    .is("employee_id", null)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  if (!members?.length) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, phone")
+    .in("id", members.map((member) => member.user_id));
+
+  const profilesById = new Map(
+    (profiles ?? []).map((profile) => [profile.id, profile]),
+  );
+
+  return members.map((member) => {
+    const profile = profilesById.get(member.user_id);
+    return {
+      membershipId: member.id,
+      userId: member.user_id,
+      fullName: profile?.full_name ?? "Usuario sin perfil",
+      email: profile?.email ?? null,
+      phone: profile?.phone ?? null,
+    };
+  });
+}
+
 export async function getEmployeesData(
   supabase: SupabaseClient<Database>,
   organizationId: string,

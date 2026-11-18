@@ -230,6 +230,35 @@ export async function listOrganizations(options: {
   };
 }
 
+/** Todas las empresas con datos de licencia, ordenadas por vencimiento. */
+export async function listLicenseOrganizations(search?: string): Promise<{
+  items: OrganizationRow[];
+  total: number;
+}> {
+  const admin = createSupabaseAdminClient();
+  let query = admin.from("organizations").select("*", { count: "exact" });
+  const term = search?.trim();
+  if (term) {
+    const like = escapeLike(term);
+    query = query.or(`name.ilike.${like},slug.ilike.${like},email.ilike.${like}`);
+  }
+  const { data, count, error } = await query
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+
+  const items = (data ?? []).sort((a, b) => {
+    const aTime = a.license_expires_at ?? a.current_period_end;
+    const bTime = b.license_expires_at ?? b.current_period_end;
+    if (!aTime && !bTime) return 0;
+    if (!aTime) return 1;
+    if (!bTime) return -1;
+    return new Date(aTime).getTime() - new Date(bTime).getTime();
+  });
+
+  return { items, total: count ?? items.length };
+}
+
 export async function getOrganizationById(
   id: string,
 ): Promise<OrganizationDetail | null> {

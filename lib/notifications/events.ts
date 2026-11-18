@@ -58,6 +58,7 @@ export async function notifyAppointmentById(
       organization: {
         id: organization.data.id,
         name: organization.data.name,
+        slug: organization.data.slug,
         email: organization.data.email,
         timezone: organization.data.timezone,
         currency: organization.data.currency,
@@ -66,6 +67,7 @@ export async function notifyAppointmentById(
       appointment,
       serviceName: service.data.name,
       employeeName: employee.data.full_name,
+      employeeUserId: employee.data.user_id,
       client: {
         name: client.data.full_name,
         email: client.data.email,

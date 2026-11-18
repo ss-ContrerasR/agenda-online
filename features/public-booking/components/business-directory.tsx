@@ -1,8 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -21,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AppImage } from "@/components/shared/app-image";
 import type { PublicOrganizationCard } from "@/features/public-booking/queries";
 import { initials } from "@/lib/utils";
 
@@ -41,6 +41,9 @@ export function BusinessDirectory({
   const [query, setQuery] = useState("");
   const [city, setCity] = useState(ALL);
   const [category, setCategory] = useState(ALL);
+  // El filtro se recalcula con la versión diferida para que escribir siga
+  // siendo fluido aunque el directorio tenga muchos negocios.
+  const deferredQuery = useDeferredValue(query);
 
   const cities = useMemo(
     () =>
@@ -63,7 +66,7 @@ export function BusinessDirectory({
   );
 
   const filtered = useMemo(() => {
-    const normalizedQuery = normalize(query.trim());
+    const normalizedQuery = normalize(deferredQuery.trim());
 
     return organizations.filter((organization) => {
       if (city !== ALL && organization.city !== city) return false;
@@ -81,7 +84,7 @@ export function BusinessDirectory({
         ].join(" "),
       ).includes(normalizedQuery);
     });
-  }, [organizations, query, city, category]);
+  }, [organizations, deferredQuery, city, category]);
 
   const hasFilters = query.trim() !== "" || city !== ALL || category !== ALL;
 
@@ -174,7 +177,7 @@ export function BusinessDirectory({
               <div className="relative flex h-32 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
                 <span className="relative flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-background text-base font-semibold shadow-sm">
                   {organization.logoUrl ? (
-                    <Image
+                    <AppImage
                       src={organization.logoUrl}
                       alt=""
                       fill

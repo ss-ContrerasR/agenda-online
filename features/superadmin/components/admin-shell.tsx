@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { ShieldCheck } from "lucide-react";
 import { signOutAction } from "@/features/auth/actions";
+import { GuidedTour } from "@/components/shared/guided-tour";
 import { Button } from "@/components/ui/button";
 import { AdminMobileNav, AdminNav } from "./admin-nav";
 
@@ -28,6 +29,7 @@ export function AdminShell({
               <span className="truncate">Consola de plataforma</span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <GuidedTour variant="admin" />
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/dashboard">Ir al panel</Link>
               </Button>

@@ -34,12 +34,16 @@ type PendingAction = "confirm" | "complete" | "no_show" | "cancel" | "delete" | 
 export function AppointmentStatusActions({
   appointmentId,
   status,
-  canWrite,
+  canManage,
+  canWriteOwn,
   canDelete,
 }: {
   appointmentId: string;
   status: AppointmentStatus;
-  canWrite: boolean;
+  /** Confirmar, cancelar y otras acciones de gestión completa. */
+  canManage: boolean;
+  /** Completar o marcar "No asistió" en las citas propias. */
+  canWriteOwn: boolean;
   canDelete: boolean;
 }) {
   const router = useRouter();
@@ -78,16 +82,17 @@ export function AppointmentStatusActions({
   }
 
   const open = status === "pending" || status === "confirmed";
+  const canCloseOwn = canManage || canWriteOwn;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {canWrite && status === "pending" ? (
+      {canManage && status === "pending" ? (
         <Button size="sm" onClick={() => run("confirmed")} disabled={pending}>
           <Check className="size-4" />
           Confirmar
         </Button>
       ) : null}
-      {canWrite && open ? (
+      {canCloseOwn && open ? (
         <Button
           size="sm"
           variant="outline"
@@ -98,7 +103,7 @@ export function AppointmentStatusActions({
           Completar
         </Button>
       ) : null}
-      {canWrite && open ? (
+      {canCloseOwn && open ? (
         <Button
           size="sm"
           variant="outline"
@@ -109,7 +114,7 @@ export function AppointmentStatusActions({
           No asistió
         </Button>
       ) : null}
-      {canWrite && open ? (
+      {canManage && open ? (
         <Button
           size="sm"
           variant="outline"

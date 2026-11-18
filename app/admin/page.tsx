@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   CircleDollarSign,
+  ReceiptText,
   ScrollText,
   Users,
 } from "lucide-react";
@@ -39,6 +40,12 @@ const QUICK_LINKS = [
     label: "Gestionar empresas",
     description: "Altas, suspensión y facturación",
     icon: Building2,
+  },
+  {
+    href: "/admin/licencias",
+    label: "Administrar licencias",
+    description: "Planes, fechas de pago y suspensión",
+    icon: ReceiptText,
   },
   {
     href: "/admin/usuarios",

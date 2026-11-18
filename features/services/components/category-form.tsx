@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, FolderPlus, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { AlertCircle, FolderPlus, Loader2, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createCategoryAction,
@@ -129,7 +129,7 @@ export function CategoryFormDialog({ category }: { category?: ServiceCategoryRow
       <DialogTrigger asChild>
         {category ? (
           <Button variant="ghost" size="icon-sm" aria-label="Editar categoría">
-            <FolderPlus className="size-4" />
+            <Pencil className="size-4" />
           </Button>
         ) : (
           <Button variant="outline" size="sm">

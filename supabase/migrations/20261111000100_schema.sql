@@ -1,5 +1,5 @@
 -- =============================================================================
--- AgendaPro — Esquema base (multi-tenant)
+-- AgendaTEX — Esquema base (multi-tenant)
 -- Ejecutar en Supabase (SQL Editor o `supabase db reset`).
 -- =============================================================================
 

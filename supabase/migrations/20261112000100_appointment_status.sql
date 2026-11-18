@@ -1,5 +1,5 @@
 -- =============================================================================
--- AgendaPro — Cambios de estado de citas (transaccional con historial)
+-- AgendaTEX — Cambios de estado de citas (transaccional con historial)
 -- =============================================================================
 
 set search_path = public, extensions;

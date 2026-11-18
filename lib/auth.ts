@@ -12,6 +12,10 @@ import type {
   ProfileRow,
 } from "@/types/database";
 import { AppError } from "@/lib/errors";
+import {
+  getLicenseExpiresAt,
+  isOrganizationSuspended,
+} from "@/lib/license";
 import { can, type Permission } from "@/lib/permissions";
 
 export type SessionContext = {
@@ -149,6 +153,13 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   if (!organization) return null;
 
+  if (isOrganizationSuspended(organization)) {
+    const params = new URLSearchParams({ org: organization.name });
+    const expiresAt = getLicenseExpiresAt(organization);
+    if (expiresAt) params.set("expires", expiresAt);
+    redirect(`/suspendido?${params.toString()}`);
+  }
+
   return {
     user,
     profile: profile ?? null,
@@ -224,6 +235,16 @@ export async function requirePermission(
 ): Promise<SessionContext> {
   const session = await requireSession();
   if (!can(session.membership.role, permission)) {
+    // Una cuenta con rol Empleado que todavía no tiene ficha en Equipo no debe
+    // terminar en una pantalla de error. Vuelve al resumen, donde se explica
+    // cómo vincularla, en lugar de mostrar un "No tienes permisos" genérico.
+    if (
+      session.membership.role === "employee" &&
+      !session.membership.employee_id
+    ) {
+      redirect("/dashboard");
+    }
+
     throw new AppError(
       "FORBIDDEN",
       "No tienes permisos para realizar esta acción.",

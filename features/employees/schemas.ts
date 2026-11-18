@@ -25,6 +25,11 @@ export const updateEmployeeSchema = employeeSchema.extend({
   employeeId: uuidField,
 });
 
+/** Alta de personal a partir de una cuenta con rol Empleado. */
+export const createEmployeeFromMemberSchema = employeeSchema.extend({
+  memberId: uuidField,
+});
+
 export type EmployeeInput = z.infer<typeof employeeSchema>;
 
 /** Convierte los campos del formulario (incluidos los multiselect) en datos de Zod. */

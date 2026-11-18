@@ -18,6 +18,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAppointmentById } from "@/features/appointments/queries";
 import { AppointmentStatusActions } from "@/features/appointments/components/status-actions";
 import { RescheduleForm } from "@/features/appointments/components/reschedule-form";
+import { HighlightOnMount } from "@/components/shared/highlight-on-mount";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -42,11 +43,17 @@ export const metadata: Metadata = { title: "Detalle de la cita" };
 
 export default async function AppointmentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requirePermission("appointments:read");
   const { id } = await params;
+  const query = await searchParams;
+  const highlight = Array.isArray(query.highlight)
+    ? query.highlight[0]
+    : query.highlight;
   const supabase = await createSupabaseServerClient();
   const result = await getAppointmentById(
     supabase,
@@ -60,15 +67,18 @@ export default async function AppointmentDetailPage({
   const timezone = session.organization.timezone;
   const currency = session.organization.currency;
   const role = session.membership.role;
-  const canWrite =
-    can(role, "appointments:write") || can(role, "appointments:write:own");
+  const isEmployee = role === "employee";
+  const canManage = can(role, "appointments:write");
+  const canWriteOwn = can(role, "appointments:write:own");
   const canDelete = role === "owner" || role === "admin";
+  const canOpenActions = canManage || canWriteOwn || canDelete;
   const open = appointment.status === "pending" || appointment.status === "confirmed";
 
   const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/reservar/${session.organization.slug}/cita/${appointment.public_token}`;
 
   return (
     <div className="space-y-5">
+      <HighlightOnMount id={highlight === id ? id : null} />
       <PageHeader
         eyebrow="Cita"
         title={appointment.client?.full_name ?? "Detalle de la cita"}
@@ -84,7 +94,7 @@ export default async function AppointmentDetailPage({
                 <ArrowLeft className="size-4" /> Volver
               </Link>
             </Button>
-            {open && canWrite ? (
+            {open && canManage ? (
               <Button asChild size="sm">
                 <Link href={`/dashboard/citas/${appointment.id}/editar`}>
                   <Pencil className="size-4" /> Editar cita
@@ -107,11 +117,12 @@ export default async function AppointmentDetailPage({
             </span>
           ) : null}
         </div>
-        {canWrite ? (
+        {canOpenActions ? (
           <AppointmentStatusActions
             appointmentId={appointment.id}
             status={appointment.status}
-            canWrite={canWrite}
+            canManage={canManage}
+            canWriteOwn={canWriteOwn}
             canDelete={canDelete}
           />
         ) : null}
@@ -119,7 +130,7 @@ export default async function AppointmentDetailPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card>
+          <Card data-highlight-id={appointment.id}>
             <CardHeader>
               <CardTitle>Información de la cita</CardTitle>
             </CardHeader>
@@ -187,7 +198,7 @@ export default async function AppointmentDetailPage({
             </CardContent>
           </Card>
 
-          {open && canWrite ? (
+          {open && canManage ? (
             <Card>
               <CardHeader>
                 <CardTitle>Reprogramar</CardTitle>
@@ -250,7 +261,7 @@ export default async function AppointmentDetailPage({
                   <p className="truncate text-sm font-medium">
                     {appointment.client?.full_name ?? "Cliente eliminado"}
                   </p>
-                  {appointment.client ? (
+                  {appointment.client && !isEmployee ? (
                     <Link
                       href={`/dashboard/clientes/${appointment.client.id}`}
                       className="text-xs text-primary hover:underline"
@@ -285,24 +296,26 @@ export default async function AppointmentDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Enlace para el cliente</CardTitle>
-              <CardDescription>
-                El cliente puede cancelar o reprogramar con este enlace seguro.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="break-all rounded-lg bg-muted/60 p-2.5 font-mono text-[11px] text-muted-foreground">
-                {publicUrl}
-              </p>
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <Link href={`/reservar/${session.organization.slug}/cita/${appointment.public_token}`} target="_blank">
-                  <ExternalLink className="size-4" /> Abrir página del cliente
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          {isEmployee ? null : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Enlace para el cliente</CardTitle>
+                <CardDescription>
+                  El cliente puede cancelar o reprogramar con este enlace seguro.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="break-all rounded-lg bg-muted/60 p-2.5 font-mono text-[11px] text-muted-foreground">
+                  {publicUrl}
+                </p>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href={`/reservar/${session.organization.slug}/cita/${appointment.public_token}`} target="_blank">
+                    <ExternalLink className="size-4" /> Abrir página del cliente
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
